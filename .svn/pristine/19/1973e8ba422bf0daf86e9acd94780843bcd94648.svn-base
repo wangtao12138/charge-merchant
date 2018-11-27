@@ -1,0 +1,48 @@
+package cn.com.cdboost.charge.merchant.dubbo;
+
+import cn.com.cdboost.charge.base.exception.BusinessException;
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceVo;
+import cn.com.cdboost.charge.merchant.vo.info.IcCardCountVo;
+import cn.com.cdboost.charge.merchant.vo.info.IcCardDetailVo;
+import cn.com.cdboost.charge.merchant.vo.param.IcCardParam;
+
+/**
+ * ic卡接口
+ */
+public interface IcCardService {
+    /**
+     * 统计IC卡数量
+     * @param param
+     * @return
+     */
+    IcCardCountVo queryIcCount(IcCardParam param);
+
+    /**
+     * 查询ic卡详情
+     * @param cardId
+     * @return
+     */
+    IcCardDetailVo queryIcDetail(String cardId);
+
+    /**
+     * 查询ic卡列表
+     * @param param
+     * @return
+     */
+    PageData queryIcList(IcCardParam param);
+
+    /**
+     * 商户绑定ic卡到站点
+     * @param merchantGuid
+     * @param projectGuid
+     * @param cardId
+     */
+    void bindingProject(String merchantGuid, String projectGuid, String cardId) throws BusinessException;
+
+    /**
+     * 商户注销ic卡
+     * @param cardId
+     */
+    void cancelCard(String cardId);
+}

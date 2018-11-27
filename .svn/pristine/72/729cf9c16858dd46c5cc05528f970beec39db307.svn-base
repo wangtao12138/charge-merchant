@@ -1,0 +1,17 @@
+package cn.com.cdboost.charge.merchant.vo.param;
+
+import cn.com.cdboost.charge.base.vo.PageQueryParam;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.io.Serializable;
+
+@Setter
+@Getter
+public class PropertyQueryParam extends PageQueryParam implements Serializable{
+
+    private static final long serialVersionUID = 3142235269563435741L;
+    @ApiModelProperty(value = "商户guid")
+    private String merchantGuid;
+}

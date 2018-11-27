@@ -1,0 +1,637 @@
+package cn.com.cdboost.charge.merchant.model;
+
+import javax.persistence.*;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.util.Date;
+
+@Table(name = "cp_d_project")
+public class Project implements Serializable {
+    /**
+     * 标识id
+     */
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    /**
+     * 项目标识
+     */
+    @Column(name = "project_guid")
+    private String projectGuid;
+
+    /**
+     * 商户标识
+     */
+    @Column(name = "merchant_guid")
+    private String merchantGuid;
+
+    /**
+     * 物业标识
+     */
+    @Column(name = "property_guid")
+    private String propertyGuid;
+
+    /**
+     * 运营模式 1-代理商自运营
+     */
+    @Column(name = "operate_mode")
+    private Integer operateMode;
+
+    /**
+     * 项目名称
+     */
+    @Column(name = "project_name")
+    private String projectName;
+
+    /**
+     * 项目位置
+     */
+    @Column(name = "project_addr")
+    private String projectAddr;
+
+    /**
+     * 小区名称
+     */
+    @Column(name = "community_name")
+    private String communityName;
+
+    /**
+     * 物业公司名称
+     */
+    @Column(name = "company_name")
+    private String companyName;
+
+    /**
+     * 联系人员
+     */
+    private String contact;
+
+    /**
+     * 联系电话
+     */
+    @Column(name = "contact_phone")
+    private String contactPhone;
+
+    /**
+     * 提成金额
+     */
+    @Column(name = "up_price")
+    private BigDecimal upPrice;
+
+    /**
+     * 基础电价
+     */
+    @Column(name = "base_price")
+    private BigDecimal basePrice;
+
+    /**
+     * 充电桩执行的电价
+     */
+    private BigDecimal price;
+
+    /**
+     * 经度坐标
+     */
+    private BigDecimal lng;
+
+    /**
+     * 纬度坐标
+     */
+    private BigDecimal lat;
+
+    /**
+     * 1 GPS 2百度坐标
+     */
+    @Column(name = "location_type")
+    private Integer locationType;
+
+    /**
+     * 省
+     */
+    private String province;
+
+    /**
+     * 市
+     */
+    private String city;
+
+    /**
+     * 区
+     */
+    private String district;
+
+    /**
+     * 项目备注信息
+     */
+    private String remark;
+
+    /**
+     * 数据有效 1-有效  0-删除
+     */
+    @Column(name = "is_del")
+    private Integer isDel;
+
+    /**
+     * 允许IC欠费天数
+     */
+    @Column(name = "own_days")
+    private Integer ownDays;
+
+    /**
+     * 创建时间
+     */
+    @Column(name = "create_time")
+    private Date createTime;
+
+    /**
+     * 更新时间
+     */
+    @Column(name = "update_time")
+    private Date updateTime;
+
+    /**
+     * 方案类型：0-方案1；1-方案2
+     */
+    @Column(name = "scheme_type")
+    private Integer schemeType;
+
+    /**
+     * 组织结构标识
+     */
+    @Column(name = "org_no")
+    private Long orgNo;
+
+    /**
+     * 总表表号
+     */
+    @Column(name = "meter_no")
+    private String meterNo;
+
+    private static final long serialVersionUID = 1L;
+
+
+    public String getMeterNo() {
+        return meterNo;
+    }
+
+    public void setMeterNo(String meterNo) {
+        this.meterNo = meterNo;
+    }
+
+    public Long getOrgNo() {
+        return orgNo;
+    }
+
+    public void setOrgNo(Long orgNo) {
+        this.orgNo = orgNo;
+    }
+
+    /**
+     * 获取标识id
+     *
+     * @return id - 标识id
+     */
+    public Integer getId() {
+        return id;
+    }
+
+    /**
+     * 设置标识id
+     *
+     * @param id 标识id
+     */
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    /**
+     * 获取项目标识
+     *
+     * @return project_guid - 项目标识
+     */
+    public String getProjectGuid() {
+        return projectGuid;
+    }
+
+    /**
+     * 设置项目标识
+     *
+     * @param projectGuid 项目标识
+     */
+    public void setProjectGuid(String projectGuid) {
+        this.projectGuid = projectGuid;
+    }
+
+    /**
+     * 获取商户标识
+     *
+     * @return merchant_guid - 商户标识
+     */
+    public String getMerchantGuid() {
+        return merchantGuid;
+    }
+
+    /**
+     * 设置商户标识
+     *
+     * @param merchantGuid 商户标识
+     */
+    public void setMerchantGuid(String merchantGuid) {
+        this.merchantGuid = merchantGuid;
+    }
+
+    /**
+     * 获取物业标识
+     *
+     * @return property_guid - 物业标识
+     */
+    public String getPropertyGuid() {
+        return propertyGuid;
+    }
+
+    /**
+     * 设置物业标识
+     *
+     * @param propertyGuid 物业标识
+     */
+    public void setPropertyGuid(String propertyGuid) {
+        this.propertyGuid = propertyGuid;
+    }
+
+    /**
+     * 获取运营模式 1-代理商自运营
+     *
+     * @return operate_mode - 运营模式 1-代理商自运营
+     */
+    public Integer getOperateMode() {
+        return operateMode;
+    }
+
+    /**
+     * 设置运营模式 1-代理商自运营
+     *
+     * @param operateMode 运营模式 1-代理商自运营
+     */
+    public void setOperateMode(Integer operateMode) {
+        this.operateMode = operateMode;
+    }
+
+    /**
+     * 获取项目名称
+     *
+     * @return project_name - 项目名称
+     */
+    public String getProjectName() {
+        return projectName;
+    }
+
+    /**
+     * 设置项目名称
+     *
+     * @param projectName 项目名称
+     */
+    public void setProjectName(String projectName) {
+        this.projectName = projectName;
+    }
+
+    /**
+     * 获取项目位置
+     *
+     * @return project_addr - 项目位置
+     */
+    public String getProjectAddr() {
+        return projectAddr;
+    }
+
+    /**
+     * 设置项目位置
+     *
+     * @param projectAddr 项目位置
+     */
+    public void setProjectAddr(String projectAddr) {
+        this.projectAddr = projectAddr;
+    }
+
+    /**
+     * 获取小区名称
+     *
+     * @return community_name - 小区名称
+     */
+    public String getCommunityName() {
+        return communityName;
+    }
+
+    /**
+     * 设置小区名称
+     *
+     * @param communityName 小区名称
+     */
+    public void setCommunityName(String communityName) {
+        this.communityName = communityName;
+    }
+
+    /**
+     * 获取物业公司名称
+     *
+     * @return company_name - 物业公司名称
+     */
+    public String getCompanyName() {
+        return companyName;
+    }
+
+    /**
+     * 设置物业公司名称
+     *
+     * @param companyName 物业公司名称
+     */
+    public void setCompanyName(String companyName) {
+        this.companyName = companyName;
+    }
+
+    /**
+     * 获取联系人员
+     *
+     * @return contact - 联系人员
+     */
+    public String getContact() {
+        return contact;
+    }
+
+    /**
+     * 设置联系人员
+     *
+     * @param contact 联系人员
+     */
+    public void setContact(String contact) {
+        this.contact = contact;
+    }
+
+    /**
+     * 获取联系电话
+     *
+     * @return contact_phone - 联系电话
+     */
+    public String getContactPhone() {
+        return contactPhone;
+    }
+
+    /**
+     * 设置联系电话
+     *
+     * @param contactPhone 联系电话
+     */
+    public void setContactPhone(String contactPhone) {
+        this.contactPhone = contactPhone;
+    }
+
+    /**
+     * 获取提成金额
+     *
+     * @return up_price - 提成金额
+     */
+    public BigDecimal getUpPrice() {
+        return upPrice;
+    }
+
+    /**
+     * 设置提成金额
+     *
+     * @param upPrice 提成金额
+     */
+    public void setUpPrice(BigDecimal upPrice) {
+        this.upPrice = upPrice;
+    }
+
+    /**
+     * 获取基础电价
+     *
+     * @return base_price - 基础电价
+     */
+    public BigDecimal getBasePrice() {
+        return basePrice;
+    }
+
+    /**
+     * 设置基础电价
+     *
+     * @param basePrice 基础电价
+     */
+    public void setBasePrice(BigDecimal basePrice) {
+        this.basePrice = basePrice;
+    }
+
+    /**
+     * 获取充电桩执行的电价
+     *
+     * @return price - 充电桩执行的电价
+     */
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    /**
+     * 设置充电桩执行的电价
+     *
+     * @param price 充电桩执行的电价
+     */
+    public void setPrice(BigDecimal price) {
+        this.price = price;
+    }
+
+    /**
+     * 获取经度坐标
+     *
+     * @return lng - 经度坐标
+     */
+    public BigDecimal getLng() {
+        return lng;
+    }
+
+    /**
+     * 设置经度坐标
+     *
+     * @param lng 经度坐标
+     */
+    public void setLng(BigDecimal lng) {
+        this.lng = lng;
+    }
+
+    /**
+     * 获取纬度坐标
+     *
+     * @return lat - 纬度坐标
+     */
+    public BigDecimal getLat() {
+        return lat;
+    }
+
+    /**
+     * 设置纬度坐标
+     *
+     * @param lat 纬度坐标
+     */
+    public void setLat(BigDecimal lat) {
+        this.lat = lat;
+    }
+
+    /**
+     * 获取1 GPS 2百度坐标
+     *
+     * @return location_type - 1 GPS 2百度坐标
+     */
+    public Integer getLocationType() {
+        return locationType;
+    }
+
+    /**
+     * 设置1 GPS 2百度坐标
+     *
+     * @param locationType 1 GPS 2百度坐标
+     */
+    public void setLocationType(Integer locationType) {
+        this.locationType = locationType;
+    }
+
+    /**
+     * 获取省
+     *
+     * @return province - 省
+     */
+    public String getProvince() {
+        return province;
+    }
+
+    /**
+     * 设置省
+     *
+     * @param province 省
+     */
+    public void setProvince(String province) {
+        this.province = province;
+    }
+
+    /**
+     * 获取市
+     *
+     * @return city - 市
+     */
+    public String getCity() {
+        return city;
+    }
+
+    /**
+     * 设置市
+     *
+     * @param city 市
+     */
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    /**
+     * 获取区
+     *
+     * @return district - 区
+     */
+    public String getDistrict() {
+        return district;
+    }
+
+    /**
+     * 设置区
+     *
+     * @param district 区
+     */
+    public void setDistrict(String district) {
+        this.district = district;
+    }
+
+    /**
+     * 获取项目备注信息
+     *
+     * @return remark - 项目备注信息
+     */
+    public String getRemark() {
+        return remark;
+    }
+
+    /**
+     * 设置项目备注信息
+     *
+     * @param remark 项目备注信息
+     */
+    public void setRemark(String remark) {
+        this.remark = remark;
+    }
+
+    /**
+     * 获取数据有效 1-有效  0-删除
+     *
+     * @return is_del - 数据有效 1-有效  0-删除
+     */
+    public Integer getIsDel() {
+        return isDel;
+    }
+
+    /**
+     * 设置数据有效 1-有效  0-删除
+     *
+     * @param isDel 数据有效 1-有效  0-删除
+     */
+    public void setIsDel(Integer isDel) {
+        this.isDel = isDel;
+    }
+
+    public Integer getOwnDays() {
+        return ownDays;
+    }
+
+    public void setOwnDays(Integer ownDays) {
+        this.ownDays = ownDays;
+    }
+
+    /**
+     * 获取创建时间
+     *
+     * @return create_time - 创建时间
+     */
+    public Date getCreateTime() {
+        return createTime;
+    }
+
+    /**
+     * 设置创建时间
+     *
+     * @param createTime 创建时间
+     */
+    public void setCreateTime(Date createTime) {
+        this.createTime = createTime;
+    }
+
+    /**
+     * 获取更新时间
+     *
+     * @return update_time - 更新时间
+     */
+    public Date getUpdateTime() {
+        return updateTime;
+    }
+
+    /**
+     * 设置更新时间
+     *
+     * @param updateTime 更新时间
+     */
+    public void setUpdateTime(Date updateTime) {
+        this.updateTime = updateTime;
+    }
+
+    public Integer getSchemeType() {
+        return schemeType;
+    }
+
+    public void setSchemeType(Integer schemeType) {
+        this.schemeType = schemeType;
+    }
+}

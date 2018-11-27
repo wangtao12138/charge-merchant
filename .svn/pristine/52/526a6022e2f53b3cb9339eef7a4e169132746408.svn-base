@@ -1,0 +1,10 @@
+package cn.com.cdboost.charge.merchant.service;
+
+import cn.com.cdboost.charge.merchant.common.BaseService;
+import cn.com.cdboost.charge.merchant.model.MerchantInfo;
+
+/**
+ * 商户接口
+ */
+public interface IMerchantInfoService extends BaseService<MerchantInfo> {
+}

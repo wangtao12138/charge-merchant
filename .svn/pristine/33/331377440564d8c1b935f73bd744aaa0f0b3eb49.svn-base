@@ -1,0 +1,22 @@
+package cn.com.cdboost.charge.merchant.vo.dto;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class ChargingCountByRunState {
+
+    private Integer errorTotal;
+
+    private Integer freeTotal;
+
+    private Integer onTotal;
+
+    private Integer offTotal;
+
+    private Integer total;
+
+    private Integer offlineTotal;
+
+}

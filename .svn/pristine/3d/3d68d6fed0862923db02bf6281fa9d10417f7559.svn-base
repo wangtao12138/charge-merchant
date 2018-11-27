@@ -1,0 +1,61 @@
+package cn.com.cdboost.charge.merchant.dto;
+
+import java.util.List;
+
+public class ElectricCountQueryDto {
+    private String mark;
+
+    private String nodeId;
+    private Integer nodeType;
+    private List<Long> orgNoList;
+    private String startTime;
+    private String endTime;
+
+    public String getStartTime() {
+        return startTime;
+    }
+
+    public void setStartTime(String startTime) {
+        this.startTime = startTime;
+    }
+
+    public String getEndTime() {
+        return endTime;
+    }
+
+    public void setEndTime(String endTime) {
+        this.endTime = endTime;
+    }
+
+    public String getNodeId() {
+        return nodeId;
+    }
+
+    public void setNodeId(String nodeId) {
+        this.nodeId = nodeId;
+    }
+
+    public Integer getNodeType() {
+        return nodeType;
+    }
+
+    public void setNodeType(Integer nodeType) {
+        this.nodeType = nodeType;
+    }
+
+    public List<Long> getOrgNoList() {
+        return orgNoList;
+    }
+
+    public void setOrgNoList(List<Long> orgNoList) {
+        this.orgNoList = orgNoList;
+    }
+
+    public String getMark() {
+        return mark;
+    }
+
+    public void setMark(String mark) {
+        this.mark = mark;
+    }
+}

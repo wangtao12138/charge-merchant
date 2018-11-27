@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.cdboost.charge.merchant.dao.DeviceMapper">
+  <resultMap id="BaseResultMap" type="cn.com.cdboost.charge.merchant.model.Device">
+    <!--
+      WARNING - @mbg.generated
+    -->
+    <result column="id" jdbcType="INTEGER" property="id" />
+    <result column="merchant_guid" jdbcType="VARCHAR" property="merchantGuid" />
+    <result column="project_guid" jdbcType="VARCHAR" property="projectGuid" />
+    <result column="charging_plie_guid" jdbcType="CHAR" property="chargingPlieGuid" />
+    <result column="device_name" jdbcType="VARCHAR" property="deviceName" />
+    <result column="device_no" jdbcType="VARCHAR" property="deviceNo" />
+    <result column="device_mode" jdbcType="VARCHAR" property="deviceMode" />
+    <result column="comm_no" jdbcType="VARCHAR" property="commNo" />
+    <result column="port" jdbcType="CHAR" property="port" />
+    <result column="online" jdbcType="INTEGER" property="online" />
+    <result column="com_method" jdbcType="INTEGER" property="comMethod" />
+    <result column="run_state" jdbcType="INTEGER" property="runState" />
+    <result column="current_limit" jdbcType="DECIMAL" property="currentLimit" />
+    <result column="province" jdbcType="VARCHAR" property="province" />
+    <result column="city" jdbcType="VARCHAR" property="city" />
+    <result column="district" jdbcType="VARCHAR" property="district" />
+    <result column="lng" jdbcType="DECIMAL" property="lng" />
+    <result column="lat" jdbcType="DECIMAL" property="lat" />
+    <result column="location_type" jdbcType="INTEGER" property="locationType" />
+    <result column="install_addr" jdbcType="VARCHAR" property="installAddr" />
+    <result column="install_date" jdbcType="DATE" property="installDate" />
+    <result column="remark" jdbcType="VARCHAR" property="remark" />
+    <result column="meter_no" jdbcType="VARCHAR" property="meterNo" />
+    <result column="meter_cno" jdbcType="CHAR" property="meterCno" />
+    <result column="transformer_no" jdbcType="VARCHAR" property="transformerNo" />
+    <result column="send_flag" jdbcType="INTEGER" property="sendFlag" />
+    <result column="create_user_id" jdbcType="BIGINT" property="createUserId" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_user_id" jdbcType="BIGINT" property="updateUserId" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="is_del" jdbcType="INTEGER" property="isDel" />
+    <result column="ver" jdbcType="INTEGER" property="ver" />
+  </resultMap>
+  <sql id="QUERY-COMMON">
+    <where>
+      t.is_del = 0
+      <if test="deviceNo!=null and deviceNo!=''">
+        AND t.device_no like CONCAT('%',#{deviceNo},'%')
+      </if>
+      <if test="commNo!=null and commNo!=''">
+        AND t.comm_no like CONCAT('%',#{commNo},'%')
+      </if>
+      <if test="ver!=null and ver!=''">
+        AND t.ver like CONCAT('%',#{ver},'%')
+      </if>
+      <if test="startDate!=null and startDate!=''">
+        AND t.install_date  &gt;= #{startDate}
+      </if>
+      <if test="endDate!=null and endDate!=''">
+        AND t.install_date &lt;= #{endDate}
+      </if>
+      <if test="projectName!=null and projectName!=''">
+        AND t1.project_name  like CONCAT('%',#{projectName},'%')
+      </if>
+      <if test="projectGuid!=null and projectGuid!=''">
+        AND t1.project_guid = #{projectGuid}
+      </if>
+    </where>
+  </sql>
+  <select id="deviceList" parameterType="cn.com.cdboost.charge.merchant.dto.param.DeviceQueryParam"
+          resultType="cn.com.cdboost.charge.merchant.dto.ChargingDeviceDto">
+    SELECT
+    t.charging_plie_guid chargingPlieGuid,
+    t.device_no deviceNo,
+    t.ver ver,
+    t.device_name deviceName,
+    t.`online` online,
+    t.com_method comMethod,
+    t.comm_no commNo,
+    t.current_limit currentLimit,
+    t.install_addr installAddr,
+    t.install_date installDate,
+    t.remark remark,
+    t.port port,
+    t.project_guid projectGuid,
+    t1.project_name projectName,
+    t1.project_addr projectAddr,
+    t1.community_name communityName,
+    t1.company_name companyName,
+    t1.contact contact,
+    t1.contact_telphone contactTelphone,
+    t1.price price
+    FROM
+    cp_d_device t
+    INNER JOIN cp_d_project t1 ON t.project_guid = t1.project_guid
+    AND t1.org_no in
+    <foreach collection="orgNoList" item="item" open="(" close=")" separator="," >
+      #{item}
+    </foreach>
+    <if test="nodeType !=null and nodeType==2">
+      AND t1.project_guid=#{nodeId}
+    </if>
+    <include refid="QUERY-COMMON"/>
+    GROUP BY t.device_no order by t.id DESC
+    limit #{pageNumber},#{pageSize}
+  </select>
+  <select id="deviceAndPortList" parameterType="java.util.List"
+          resultType="cn.com.cdboost.charge.merchant.dto.ChargingDevicePortDto">
+    SELECT
+    t.charging_plie_guid chargingPlieGuid,
+    t.device_no deviceNo,
+    t.run_state runState,
+    t.comm_no commNo,
+    t.port port
+    FROM
+    cp_d_device t
+    WHERE
+    t.is_del = 0
+    AND t.device_no IN
+    <foreach collection="deviceNos" index="index" item="item" open="(" separator="," close=")">
+      #{item,jdbcType=VARCHAR}
+    </foreach>
+    order by t.id DESC
+  </select>
+  <select id="queryTotal" parameterType="cn.com.cdboost.charge.merchant.dto.param.DeviceQueryParam"
+          resultType="java.lang.Integer">
+    SELECT COUNT(*) FROM (
+    SELECT COUNT(*)
+    FROM
+    cp_d_device t
+    INNER JOIN cp_d_project t1 ON t.project_guid = t1.project_guid
+    AND t1.org_no in
+    <foreach collection="orgNoList" index="index" item="item" open="(" separator="," close=")">
+      #{item,jdbcType=VARCHAR}
+    </foreach>
+    <include refid="QUERY-COMMON"/>
+    GROUP BY t.device_no) temp
+  </select>
+  <!--查询设备基础信息详情-->
+  <select id="queryDeviceDetial" parameterType="java.lang.String" resultType="cn.com.cdboost.charge.merchant.dto.ChargingDeviceDto">
+    SELECT
+    t.charging_plie_guid chargingPlieGuid,
+    t.device_no deviceNo,
+    t.device_name deviceName,
+    t.`online` online,
+    t.run_state runState,
+    t.com_method comMethod,
+    t.comm_no commNo,
+    t.port port,
+    t.current_limit currentLimit,
+    t.install_addr installAddr,
+    t.install_date installDate,
+    t.remark remark,
+    t.project_guid projectGuid,
+    t.meter_no meterNo,
+    t.meter_cno meterCno,
+    t.transformer_no transformerNo,
+    t1.project_name projectName,
+    t1.project_addr projectAddr,
+    t1.community_name communityName,
+    t1.company_name companyName,
+    t1.contact contact,
+    t1.contact_telphone contactTelphone,
+    t1.price price
+    FROM
+    cp_d_device t
+    INNER JOIN cp_d_project t1 ON t.project_guid = t1.project_guid
+    WHERE t.charging_plie_guid=#{chargingPlieGuid}
+  </select>
+</mapper>

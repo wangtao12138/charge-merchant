@@ -1,0 +1,17 @@
+package cn.com.cdboost.charge.merchant.dao;
+
+import cn.com.cdboost.charge.merchant.common.CommonMapper;
+import cn.com.cdboost.charge.merchant.dto.ChargingDeviceDto;
+import cn.com.cdboost.charge.merchant.dto.ChargingDevicePortDto;
+import cn.com.cdboost.charge.merchant.dto.param.DeviceQueryParam;
+import cn.com.cdboost.charge.merchant.model.Device;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
+
+public interface DeviceMapper extends CommonMapper<Device> {
+    List<ChargingDeviceDto> deviceList(DeviceQueryParam queryVo);
+    List<ChargingDevicePortDto> deviceAndPortList(@Param("deviceNos") List<String> deviceNos);
+    Integer queryTotal(DeviceQueryParam queryVo);
+    ChargingDeviceDto queryDeviceDetial(@Param("chargingPlieGuid") String chargingPlieGuid);
+}

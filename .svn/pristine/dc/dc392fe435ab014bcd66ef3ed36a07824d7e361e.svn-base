@@ -1,0 +1,13 @@
+package cn.com.cdboost.charge.merchant.vo.param;
+
+import lombok.Getter;
+import lombok.Setter;
+
+import java.io.Serializable;
+
+@Getter
+@Setter
+public class DeviceQueryParam extends PageQueryParam implements Serializable {
+    //站点guid
+    private String projectGuid;
+}

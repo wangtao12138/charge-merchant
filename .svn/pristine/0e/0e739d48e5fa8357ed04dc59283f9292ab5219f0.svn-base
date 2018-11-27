@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.cdboost.charge.merchant.dao.DeviceMapper">
+  <resultMap id="BaseResultMap" type="cn.com.cdboost.charge.merchant.model.Device">
+    <!--
+      WARNING - @mbg.generated
+    -->
+    <result column="id" jdbcType="INTEGER" property="id" />
+    <result column="merchant_guid" jdbcType="VARCHAR" property="merchantGuid" />
+    <result column="project_guid" jdbcType="VARCHAR" property="projectGuid" />
+    <result column="charging_plie_guid" jdbcType="CHAR" property="chargingPlieGuid" />
+    <result column="device_name" jdbcType="VARCHAR" property="deviceName" />
+    <result column="device_no" jdbcType="VARCHAR" property="deviceNo" />
+    <result column="device_mode" jdbcType="VARCHAR" property="deviceMode" />
+    <result column="comm_no" jdbcType="VARCHAR" property="commNo" />
+    <result column="port" jdbcType="CHAR" property="port" />
+    <result column="online" jdbcType="INTEGER" property="online" />
+    <result column="com_method" jdbcType="INTEGER" property="comMethod" />
+    <result column="run_state" jdbcType="INTEGER" property="runState" />
+    <result column="current_limit" jdbcType="DECIMAL" property="currentLimit" />
+    <result column="province" jdbcType="VARCHAR" property="province" />
+    <result column="city" jdbcType="VARCHAR" property="city" />
+    <result column="district" jdbcType="VARCHAR" property="district" />
+    <result column="lng" jdbcType="DECIMAL" property="lng" />
+    <result column="lat" jdbcType="DECIMAL" property="lat" />
+    <result column="location_type" jdbcType="INTEGER" property="locationType" />
+    <result column="install_addr" jdbcType="VARCHAR" property="installAddr" />
+    <result column="install_date" jdbcType="DATE" property="installDate" />
+    <result column="remark" jdbcType="VARCHAR" property="remark" />
+    <result column="meter_no" jdbcType="VARCHAR" property="meterNo" />
+    <result column="meter_cno" jdbcType="CHAR" property="meterCno" />
+    <result column="transformer_no" jdbcType="VARCHAR" property="transformerNo" />
+    <result column="send_flag" jdbcType="INTEGER" property="sendFlag" />
+    <result column="create_user_id" jdbcType="BIGINT" property="createUserId" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_user_id" jdbcType="BIGINT" property="updateUserId" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="is_del" jdbcType="INTEGER" property="isDel" />
+  </resultMap>
+</mapper>

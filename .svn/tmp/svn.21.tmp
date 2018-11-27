@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.cdboost.charge.merchant.dao.ProjectMapper">
+    <resultMap id="BaseResultMap" type="cn.com.cdboost.charge.merchant.model.Project">
+        <!--
+          WARNING - @mbg.generated
+        -->
+        <result column="id" jdbcType="INTEGER" property="id"/>
+        <result column="project_guid" jdbcType="CHAR" property="projectGuid"/>
+        <result column="merchant_guid" jdbcType="VARCHAR" property="merchantGuid"/>
+        <result column="property_guid" jdbcType="VARCHAR" property="propertyGuid"/>
+        <result column="operate_mode" jdbcType="INTEGER" property="operateMode"/>
+        <result column="project_name" jdbcType="VARCHAR" property="projectName"/>
+        <result column="project_addr" jdbcType="VARCHAR" property="projectAddr"/>
+        <result column="community_name" jdbcType="VARCHAR" property="communityName"/>
+        <result column="company_name" jdbcType="VARCHAR" property="companyName"/>
+        <result column="contact" jdbcType="VARCHAR" property="contact"/>
+        <result column="contact_phone" jdbcType="VARCHAR" property="contactPhone"/>
+        <result column="up_price" jdbcType="DECIMAL" property="upPrice"/>
+        <result column="base_price" jdbcType="DECIMAL" property="basePrice"/>
+        <result column="price" jdbcType="DECIMAL" property="price"/>
+        <result column="lng" jdbcType="DECIMAL" property="lng"/>
+        <result column="lat" jdbcType="DECIMAL" property="lat"/>
+        <result column="location_type" jdbcType="INTEGER" property="locationType"/>
+        <result column="province" jdbcType="VARCHAR" property="province"/>
+        <result column="city" jdbcType="VARCHAR" property="city"/>
+        <result column="district" jdbcType="VARCHAR" property="district"/>
+        <result column="remark" jdbcType="VARCHAR" property="remark"/>
+        <result column="is_del" jdbcType="INTEGER" property="isDel"/>
+        <result column="own_days" jdbcType="INTEGER" property="ownDays"/>
+        <result column="scheme_type" jdbcType="INTEGER" property="schemeType"/>
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
+        <result column="update_time" jdbcType="TIMESTAMP" property="updateTime"/>
+        <result column="profit_ratio" jdbcType="DECIMAL" property="profitRatio"/>
+        <result column="service_ratio" jdbcType="DECIMAL" property="serviceRatio"/>
+        <result column="org_no" property="orgNo" jdbcType="BIGINT" />
+    </resultMap>
+    <select id="queryProjectDeviceCount" parameterType="cn.com.cdboost.charge.merchant.dto.param.ProjectQueryParamDao"
+            resultType="cn.com.cdboost.charge.merchant.dto.ProjectListDto">
+        SELECT
+        SUM(t2.`online` = 0) offLineNum,
+        SUM(t2.`online`=1 AND t2.run_state=0) freeNum,
+        SUM(t2.`online`=1 AND t2.run_state=1) chargingNum,
+        SUM(t2.`online`=1 AND t2.run_state=-1) faultNum,
+        any_value(t1.project_guid) projectGuid,
+        any_value(t1.project_name) projectName,
+        any_value(t1.project_addr) projectAddr
+        FROM
+        cp_d_project t1
+        LEFT JOIN cp_d_device t2 ON t1.project_guid = t2.project_guid AND t2.is_del = 1
+        WHERE
+        t1.is_del = 1
+        <if test="projectName!=null and projectName!=''">
+            AND t1.project_name like CONCAT('%',#{projectName},'%')
+        </if>
+        <if test="propertyGuid!=null and propertyGuid!=''">
+            AND t1.property_guid = #{propertyGuid}
+        </if>
+        <if test="merchantGuid!=null and merchantGuid!=''">
+            AND t1.merchant_guid = #{merchantGuid}
+        </if>
+        GROUP BY
+        t1.project_guid,t1.id ORDER BY t1.id DESC
+    </select>
+
+    <resultMap id="queryProjectTreeMap" type="cn.com.cdboost.charge.merchant.dto.ProjectInfoDaoDto">
+        <result column="project_guid" property="projectGuid" jdbcType="BIGINT"/>
+        <result column="project_name" property="projectName" jdbcType="TIMESTAMP"/>
+        <result column="org_no" property="orgNo" jdbcType="BIGINT"/>
+        <result column="projectHolds" property="projectHolds" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <select id="queryProjectTreeByName" resultMap="queryProjectTreeMap">
+        SELECT
+        t.project_guid projectGuid,
+        t.project_name projectName,
+        t.org_no orgNo,
+        h.projectHolds
+        FROM
+        (SELECT count(*) projectHolds,org_no FROM
+        cp_d_project t
+        <where>
+            t.org_no in
+            <foreach collection="list" item="item" separator="," open="(" close=")">
+                #{item,jdbcType=BIGINT}
+            </foreach>
+        </where>
+        GROUP by t.org_no)h
+        INNER JOIN
+        cp_d_project t
+        <where>
+            t.org_no=h.org_no AND t.is_del=0
+            <if test="projectName !=null and  projectName!=''">
+                and t.project_name like concat('%',#{projectName,jdbcType=VARCHAR},'%')
+            </if>
+        </where>
+    </select>
+
+    <select id="queryList" parameterType="cn.com.cdboost.charge.merchant.dto.param.ChargerSchemeQueryDaoVo" resultType="cn.com.cdboost.charge.merchant.dto.ChargingProjectDaoDto">
+        SELECT
+        t.project_guid projectGuid,
+        t.project_name projectName,
+        t.base_price basePrice,
+        t.up_price upPrice,
+        t.contact contact,
+        t.contact_telphone contactTelphone,
+        t.project_addr projectAddr,
+        t1.dev_count deviceNum,
+        t.community_name communityName,
+        t.company_name companyName,
+        t.create_time createTime,
+        t.remark remark,
+        t.org_no orgNo,
+        t.scheme_type schemeType,
+        t.meter_no meterNo
+        FROM
+        cp_d_project t
+        LEFT JOIN (SELECT project_guid,count(*)/2 as dev_count FROM cp_d_device WHERE is_del=0 GROUP BY project_guid) t1 ON t.project_guid = t1.project_guid
+        <where>
+            t.org_no IN
+            <foreach collection="orgNoList" item="item" open="(" close=")" separator="," >
+                #{item}
+            </foreach>
+            AND t.is_del = 0
+            <if test="projectName!=null and projectName!=''">
+                AND t.project_name LIKE CONCAT('%',#{projectName},'%')
+            </if>
+            <if test="nodeType !=null and nodeType==2">
+                AND t.project_guid=#{nodeId}
+            </if>
+        </where>
+        ORDER BY t.id DESC
+        LIMIT #{pageIndex},#{pageSize}
+    </select>
+    <select id="queryListTotal" parameterType="cn.com.cdboost.charge.merchant.dto.param.ChargerSchemeQueryDaoVo" resultType="java.lang.Long">
+        SELECT
+        count(1) total
+        FROM
+        cp_d_project t
+        <where>
+            t.org_no IN
+            <foreach collection="orgNoList" item="item" open="(" close=")" separator="," >
+                #{item}
+            </foreach>
+            AND t.is_del = 0
+            <if test="nodeType !=null and nodeType==2">
+                AND t.project_guid=#{nodeId}
+            </if>
+            <if test="projectName!=null and projectName!=''">
+                AND t.project_name LIKE CONCAT('%',#{projectName},'%')
+            </if>
+        </where>
+    </select>
+</mapper>

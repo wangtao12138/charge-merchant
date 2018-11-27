@@ -1,0 +1,360 @@
+package cn.com.cdboost.charge.merchant.model;
+
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.util.Date;
+import javax.persistence.*;
+
+@Table(name = "cp_d_merchant_info")
+public class MerchantInfo implements Serializable {
+    /**
+     * 标识id
+     */
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    /**
+     * 商户标识
+     */
+    @Column(name = "merchant_guid")
+    private String merchantGuid;
+
+    /**
+     * 商户名称
+     */
+    @Column(name = "merchant_name")
+    private String merchantName;
+
+    /**
+     * 商户电话
+     */
+    @Column(name = "merchant_phone")
+    private String merchantPhone;
+
+    /**
+     * 微信号
+     */
+    @Column(name = "webchart_no")
+    private String webchartNo;
+
+    /**
+     * 支付宝号
+     */
+    @Column(name = "alipay_no")
+    private String alipayNo;
+
+    /**
+     * 最近一次登录时间
+     */
+    @Column(name = "last_login_time")
+    private Date lastLoginTime;
+
+    /**
+     * 商户状态 1-正常
+     */
+    @Column(name = "merchart_state")
+    private Integer merchartState;
+
+    /**
+     * 备注信息
+     */
+    private String remark;
+
+    /**
+     * 创建时间
+     */
+    @Column(name = "create_time")
+    private Date createTime;
+
+    /**
+     * 更新时间
+     */
+    @Column(name = "update_time")
+    private Date updateTime;
+
+    /**
+     * 数据有效 0-无效  1-有效
+     */
+    @Column(name = "is_del")
+    private Integer isDel;
+
+    /**
+     * 组织结构标识
+     */
+    @Column(name = "org_no")
+    private Long orgNo;
+
+    /**
+     * 博高利润分账比例
+     */
+    @Column(name = "profit_ratio")
+    private BigDecimal profitRatio;
+
+    /**
+     * 每笔充电服务费收取比例
+     */
+    @Column(name = "service_ratio")
+    private BigDecimal serviceRatio;
+
+    /**
+     * 充电结束，给用户退款比例
+     */
+    @Column(name = "refund_ratio")
+    private BigDecimal refundRatio;
+
+    /**
+     * 服务模式（0普通商户模式，1服务商模式）
+     */
+    @Column(name = "service_mode")
+    private Integer serviceMode;
+
+
+    private static final long serialVersionUID = 1L;
+
+    public BigDecimal getProfitRatio() {
+        return profitRatio;
+    }
+
+    public void setProfitRatio(BigDecimal profitRatio) {
+        this.profitRatio = profitRatio;
+    }
+
+    public BigDecimal getServiceRatio() {
+        return serviceRatio;
+    }
+
+    public void setServiceRatio(BigDecimal serviceRatio) {
+        this.serviceRatio = serviceRatio;
+    }
+
+    public BigDecimal getRefundRatio() {
+        return refundRatio;
+    }
+
+    public void setRefundRatio(BigDecimal refundRatio) {
+        this.refundRatio = refundRatio;
+    }
+
+    public Integer getServiceMode() {
+        return serviceMode;
+    }
+
+    public void setServiceMode(Integer serviceMode) {
+        this.serviceMode = serviceMode;
+    }
+
+    /**
+     * 获取标识id
+     *
+     * @return id - 标识id
+     */
+    public Integer getId() {
+        return id;
+    }
+
+    /**
+     * 设置标识id
+     *
+     * @param id 标识id
+     */
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getMerchantGuid() {
+        return merchantGuid;
+    }
+
+    public void setMerchantGuid(String merchantGuid) {
+        this.merchantGuid = merchantGuid;
+    }
+
+    /**
+     * 获取商户名称
+     *
+     * @return merchant_name - 商户名称
+     */
+    public String getMerchantName() {
+        return merchantName;
+    }
+
+    /**
+     * 设置商户名称
+     *
+     * @param merchantName 商户名称
+     */
+    public void setMerchantName(String merchantName) {
+        this.merchantName = merchantName;
+    }
+
+    /**
+     * 获取商户电话
+     *
+     * @return merchant_phone - 商户电话
+     */
+    public String getMerchantPhone() {
+        return merchantPhone;
+    }
+
+    /**
+     * 设置商户电话
+     *
+     * @param merchantPhone 商户电话
+     */
+    public void setMerchantPhone(String merchantPhone) {
+        this.merchantPhone = merchantPhone;
+    }
+
+    /**
+     * 获取微信号
+     *
+     * @return webchart_no - 微信号
+     */
+    public String getWebchartNo() {
+        return webchartNo;
+    }
+
+    /**
+     * 设置微信号
+     *
+     * @param webchartNo 微信号
+     */
+    public void setWebchartNo(String webchartNo) {
+        this.webchartNo = webchartNo;
+    }
+
+    /**
+     * 获取支付宝号
+     *
+     * @return alipay_no - 支付宝号
+     */
+    public String getAlipayNo() {
+        return alipayNo;
+    }
+
+    /**
+     * 设置支付宝号
+     *
+     * @param alipayNo 支付宝号
+     */
+    public void setAlipayNo(String alipayNo) {
+        this.alipayNo = alipayNo;
+    }
+
+    /**
+     * 获取最近一次登录时间
+     *
+     * @return last_login_time - 最近一次登录时间
+     */
+    public Date getLastLoginTime() {
+        return lastLoginTime;
+    }
+
+    /**
+     * 设置最近一次登录时间
+     *
+     * @param lastLoginTime 最近一次登录时间
+     */
+    public void setLastLoginTime(Date lastLoginTime) {
+        this.lastLoginTime = lastLoginTime;
+    }
+
+    /**
+     * 获取商户状态 1-正常
+     *
+     * @return merchart_state - 商户状态 1-正常
+     */
+    public Integer getMerchartState() {
+        return merchartState;
+    }
+
+    /**
+     * 设置商户状态 1-正常
+     *
+     * @param merchartState 商户状态 1-正常
+     */
+    public void setMerchartState(Integer merchartState) {
+        this.merchartState = merchartState;
+    }
+
+    /**
+     * 获取备注信息
+     *
+     * @return remark - 备注信息
+     */
+    public String getRemark() {
+        return remark;
+    }
+
+    /**
+     * 设置备注信息
+     *
+     * @param remark 备注信息
+     */
+    public void setRemark(String remark) {
+        this.remark = remark;
+    }
+
+    /**
+     * 获取创建时间
+     *
+     * @return create_time - 创建时间
+     */
+    public Date getCreateTime() {
+        return createTime;
+    }
+
+    /**
+     * 设置创建时间
+     *
+     * @param createTime 创建时间
+     */
+    public void setCreateTime(Date createTime) {
+        this.createTime = createTime;
+    }
+
+    /**
+     * 获取更新时间
+     *
+     * @return update_time - 更新时间
+     */
+    public Date getUpdateTime() {
+        return updateTime;
+    }
+
+    /**
+     * 设置更新时间
+     *
+     * @param updateTime 更新时间
+     */
+    public void setUpdateTime(Date updateTime) {
+        this.updateTime = updateTime;
+    }
+
+    /**
+     * 获取数据有效 0-无效  1-有效
+     *
+     * @return is_del - 数据有效 0-无效  1-有效
+     */
+    public Integer getIsDel() {
+        return isDel;
+    }
+
+    /**
+     * 设置数据有效 0-无效  1-有效
+     *
+     * @param isDel 数据有效 0-无效  1-有效
+     */
+    public void setIsDel(Integer isDel) {
+        this.isDel = isDel;
+    }
+
+    public Long getOrgNo() {
+        return orgNo;
+    }
+
+    public void setOrgNo(Long orgNo) {
+        this.orgNo = orgNo;
+    }
+}

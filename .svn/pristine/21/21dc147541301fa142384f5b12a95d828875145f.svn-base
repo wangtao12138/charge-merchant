@@ -1,0 +1,24 @@
+package cn.com.cdboost.charge.merchant.service;
+
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.merchant.vo.info.MerchantPropertyVo;
+import cn.com.cdboost.charge.merchant.vo.param.PropertyQueryParam;
+
+import java.util.List;
+
+/**
+ * 物业接口
+ */
+public interface MerchantPropertyServiceDubbo {
+     //PageData queryPropertyByMerchantGuid(PropertyQueryParam queryVo);
+     //新增物业
+     void addProperty(MerchantPropertyVo merchantPropertyVo);
+     //修改物业
+     void updateProperty(MerchantPropertyVo merchantPropertyVo);
+     //删除物业
+     void deletePropertyByPropertyGuids(List<String> propertyGuids);
+     //查询商户下物业
+     List<MerchantPropertyVo> queryAllMerchantProperty(PropertyQueryParam queryVo);
+     //查询物业详情
+     MerchantPropertyVo queryMerchantProperty(String propertyGuid);
+}

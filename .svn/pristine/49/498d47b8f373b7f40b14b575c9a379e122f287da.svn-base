@@ -1,0 +1,27 @@
+package cn.com.cdboost.charge.merchant.service;
+
+/**
+ * @author wt
+ * @desc
+ * @create in  2018/10/10
+ **/
+
+import cn.com.cdboost.charge.merchant.vo.info.ChargingDeviceVo;
+import cn.com.cdboost.charge.merchant.vo.param.ChargerDeviceQueryParam;
+import cn.com.cdboost.charge.merchant.vo.param.DeviceParam;
+
+import java.util.List;
+
+/**
+ * web端充电设备管理接口
+ */
+public interface WebChargingDeviceServiceDubbo {
+    List<ChargingDeviceVo> deviceList(ChargerDeviceQueryParam queryParam, Integer userId);
+    void addDevice(DeviceParam chargingDevice, Integer userId);
+    //添加ic卡下发表
+    void addCardList(DeviceParam chargingDevice);
+    boolean deleteDevice(List<String> chargingPlieGuids, Integer userId);
+    //删除ic卡下发表
+    void deleteCardList(List<String> deviceNos);
+    ChargingDeviceVo queryDeviceDetial(String chargingPlieGuid);
+}

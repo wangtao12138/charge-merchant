@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.cdboost.charge.merchant.dao.MerchantPropertyMapper">
+  <resultMap id="BaseResultMap" type="cn.com.cdboost.charge.merchant.model.MerchantProperty">
+    <!--
+      WARNING - @mbg.generated
+    -->
+    <result column="id" jdbcType="INTEGER" property="id" />
+    <result column="merchant_guid" jdbcType="VARCHAR" property="merchantGuid" />
+    <result column="property_guid" jdbcType="VARCHAR" property="propertyGuid" />
+    <result column="property_name" jdbcType="VARCHAR" property="propertyName" />
+    <result column="contact_user" jdbcType="VARCHAR" property="contactUser" />
+    <result column="property_phone" jdbcType="VARCHAR" property="propertyPhone" />
+    <result column="login_name" jdbcType="VARCHAR" property="loginName" />
+    <result column="user_password" jdbcType="VARCHAR" property="userPassword" />
+    <result column="property_state" jdbcType="INTEGER" property="propertyState" />
+    <result column="remark" jdbcType="VARCHAR" property="remark" />
+    <result column="first_pinyin" jdbcType="VARCHAR" property="firstPinyin" />
+    <result column="full_pinyin" jdbcType="VARCHAR" property="fullPinyin" />
+    <result column="is_del" jdbcType="INTEGER" property="isDel" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+  </resultMap>
+  <select id="queryMerchantPropertyDto" parameterType="cn.com.cdboost.charge.merchant.dto.param.MerchantPropertyParam"
+          resultMap="BaseResultMap">
+    SELECT * FROM cp_d_merchant_property GROUP BY first_pinyin ORDER BY first_pinyin
+  </select>
+</mapper>

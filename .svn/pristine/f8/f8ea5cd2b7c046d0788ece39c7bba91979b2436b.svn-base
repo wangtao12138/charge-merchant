@@ -1,0 +1,77 @@
+package cn.com.cdboost.charge.merchant.service.impl;
+
+
+import cn.com.cdboost.charge.merchant.common.BaseServiceImpl;
+import cn.com.cdboost.charge.merchant.constant.DeviceConstant;
+import cn.com.cdboost.charge.merchant.dao.DeviceEventMapper;
+import cn.com.cdboost.charge.merchant.dao.MerchantPropertyMapper;
+import cn.com.cdboost.charge.merchant.dao.ProjectMapper;
+import cn.com.cdboost.charge.merchant.model.DeviceEvent;
+import cn.com.cdboost.charge.merchant.model.MerchantProperty;
+import cn.com.cdboost.charge.merchant.model.Project;
+import cn.com.cdboost.charge.merchant.service.IMerchantPropertyService;
+import cn.com.cdboost.charge.merchant.vo.info.MerchantPropertyVo;
+import cn.com.cdboost.charge.merchant.vo.info.TodayMerchantInfo;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import tk.mybatis.mapper.entity.Condition;
+import tk.mybatis.mapper.entity.Example;
+
+import java.util.Date;
+import java.util.List;
+
+
+@Service
+public class IMerchantPropertyServiceImpl extends BaseServiceImpl<MerchantProperty> implements IMerchantPropertyService {
+    @Autowired
+    private MerchantPropertyMapper merchantPropertyMapper;
+
+    @Autowired
+    private DeviceEventMapper deviceEventMapper;
+
+    @Autowired
+    private ProjectMapper projectMapper;
+
+    @Override
+    public void updateByPropertuGuid(MerchantPropertyVo merchantPropertyVo) {
+        MerchantProperty merchantProperty = new MerchantProperty();
+        BeanUtils.copyProperties(merchantPropertyVo,merchantProperty);
+        merchantProperty.setUpdateTime(new Date());
+        Condition condition = new Condition(MerchantProperty.class);
+        Example.Criteria criteria = condition.createCriteria();
+        criteria.andEqualTo("propertyGuid",merchantPropertyVo.getPropertyGuid());
+        merchantPropertyMapper.updateByConditionSelective(merchantProperty,condition);
+    }
+
+    @Override
+    public void batchDelete(List<String> propertyGuids) {
+        Condition condition = new Condition(MerchantProperty.class);
+        Example.Criteria criteria = condition.createCriteria();
+        criteria.andIn("propertyGuid",propertyGuids);
+        MerchantProperty merchantProperty = new MerchantProperty();
+        merchantProperty.setIsDel(DeviceConstant.IsDel.DEL.getStatus());
+        //置为删除状态
+        merchantPropertyMapper.updateByConditionSelective(merchantProperty,condition);
+    }
+
+    @Override
+    public TodayMerchantInfo queryTodayCount(String merchantGuid) {
+        Condition condition = new Condition(Project.class);
+        Example.Criteria criteria = condition.createCriteria();
+        criteria.andEqualTo("merchantGuid",merchantGuid);
+        criteria.andEqualTo("isDel",DeviceConstant.IsDel.NOTDEL.getStatus());
+        int projectNum = projectMapper.selectCountByCondition(condition);
+        TodayMerchantInfo info = new TodayMerchantInfo();
+        info.setProjectNum(projectNum);
+
+        Condition condition2 = new Condition(DeviceEvent.class);
+        Example.Criteria criteria2 = condition.createCriteria();
+        criteria2.andEqualTo("merchantGuid",merchantGuid);
+        //告警码定义
+        criteria2.andEqualTo("eventCode",1);
+        int alarmNum = deviceEventMapper.selectCountByCondition(condition2);
+        info.setAlarmNum(alarmNum);
+        return info;
+    }
+}

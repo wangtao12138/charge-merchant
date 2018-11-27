@@ -1,0 +1,17 @@
+package cn.com.cdboost.charge.merchant.vo.param;
+
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * 客户充电接口入参对象
+ */
+@Setter
+@Getter
+public class CustomerChargingParam {
+    private String deviceNo;
+
+    private String schemeGuid;
+
+    private String chargingPlieGuid;
+}

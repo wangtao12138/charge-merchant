@@ -1,0 +1,32 @@
+package cn.com.cdboost.charge.merchant.dao;
+
+import cn.com.cdboost.charge.merchant.common.CommonMapper;
+import cn.com.cdboost.charge.merchant.dto.IcCardCountDto;
+import cn.com.cdboost.charge.merchant.dto.IcCardListDto;
+import cn.com.cdboost.charge.merchant.dto.param.IcCardQueryParam;
+import cn.com.cdboost.charge.merchant.model.Card;
+
+import java.util.List;
+
+public interface CardMapper extends CommonMapper<Card> {
+    /**
+     * 统计ic卡数量
+     * @param queryParam
+     * @return
+     */
+    IcCardCountDto queryIcCount(IcCardQueryParam queryParam);
+
+    /**
+     * 查询ic卡列表
+     * @param param
+     * @return
+     */
+    List<IcCardListDto> queryIcList(IcCardQueryParam param);
+
+    /**
+     * 查询ic卡列表总数
+     * @param queryParam
+     * @return
+     */
+    Integer queryIcListTotal(IcCardQueryParam queryParam);
+}

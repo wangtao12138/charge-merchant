@@ -1,0 +1,24 @@
+package cn.com.cdboost.charge.merchant.vo.info;
+
+import lombok.Getter;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+
+/**
+ * 开电查询方案返回参数
+ */
+@Setter
+@Getter
+public class ChargingPaySchemeVo extends PaySchemeVo{
+    private static final long serialVersionUID = 2501329334347125183L;
+
+    /**
+     * 主键
+     */
+    private Integer id;
+    /**
+     * 充电桩执行的电价
+     */
+    private BigDecimal price;
+}

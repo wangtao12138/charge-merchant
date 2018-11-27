@@ -1,0 +1,129 @@
+package cn.com.cdboost.charge.merchant.dubbo.impl;
+
+import cn.com.cdboost.charge.merchant.dubbo.MerchantToCustomerService;
+import cn.com.cdboost.charge.merchant.model.Card;
+import cn.com.cdboost.charge.merchant.model.Device;
+import cn.com.cdboost.charge.merchant.model.Project;
+import cn.com.cdboost.charge.merchant.service.IDeviceService;
+import cn.com.cdboost.charge.merchant.service.IIcCardService;
+import cn.com.cdboost.charge.merchant.service.IProjectService;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceRelationVo;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceVo;
+import cn.com.cdboost.charge.merchant.vo.info.IcCardDetailVo;
+import cn.com.cdboost.charge.merchant.vo.info.ProjectVo;
+import cn.com.cdboost.charge.merchant.vo.param.DeviceQueryParam;
+import cn.com.cdboost.charge.settlement.dubbo.AccountService;
+import com.alibaba.dubbo.config.annotation.Reference;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
+import tk.mybatis.mapper.entity.Condition;
+import tk.mybatis.mapper.entity.Example;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+@Service
+public class MerchantToCustomerServiceImpl implements MerchantToCustomerService {
+    @Autowired
+    private IDeviceService iDeviceService;
+    @Autowired
+    private IProjectService iProjectService;
+    @Autowired
+    private IIcCardService iIcCardService;
+
+    @Reference(version = "1.0")
+    private AccountService accountService;
+
+    @Override
+    public DeviceRelationVo queryDevice(DeviceQueryParam queryParam) {
+        DeviceRelationVo deviceVo = new DeviceRelationVo();
+        Device param = new Device();
+        if (!StringUtils.isEmpty(queryParam.getDeviceNo())){
+            param.setDeviceNo(queryParam.getDeviceNo().substring(0,7));
+            param.setPort(queryParam.getDeviceNo().substring(7,8));
+        }
+        if (!StringUtils.isEmpty(queryParam.getChargingPlieGuid())){
+            param.setChargingPlieGuid(queryParam.getChargingPlieGuid());
+        }
+        Device device = iDeviceService.selectOne(param);
+        Project project = new Project();
+        project.setProjectGuid(device.getProjectGuid());
+        Project selectProject = iProjectService.selectOne(project);
+        BeanUtils.copyProperties(device,deviceVo);
+        deviceVo.setContactPhone(selectProject.getContactPhone());
+        deviceVo.setProjectName(selectProject.getProjectName());
+        return deviceVo;
+    }
+
+    @Override
+    public List<DeviceRelationVo> queryDevices(List<String> chargingPlieGuids) {
+        List<Device> devices = iDeviceService.queryDevices(chargingPlieGuids);
+        Set<String> projectGuids = Sets.newHashSet();
+        List<DeviceRelationVo> deviceVos = Lists.newArrayList();
+        for (Device device : devices) {
+            projectGuids.add(device.getProjectGuid());
+            DeviceRelationVo deviceVo = new DeviceRelationVo();
+            BeanUtils.copyProperties(device,deviceVo);
+            deviceVos.add(deviceVo);
+        }
+        List<Project> projects = iProjectService.queryProjects(new ArrayList(projectGuids));
+        Map<String,Project> projectMap = Maps.newHashMap();
+        if (!CollectionUtils.isEmpty(projects)) {
+            for (Project project : projects) {
+                projectMap.put(project.getProjectGuid(), project);
+            }
+        }
+        for (DeviceRelationVo deviceVo : deviceVos) {
+            deviceVo.setContactPhone(projectMap.get(deviceVo.getProjectGuid()).getContactPhone());
+            deviceVo.setProjectName(projectMap.get(deviceVo.getProjectGuid()).getProjectName());
+        }
+        return deviceVos;
+    }
+
+    @Override
+    public void bindingCustomer(String cardId, String customerGuid,String userPhone) {
+        iIcCardService.bindingCustomer(cardId,customerGuid,userPhone);
+    }
+
+    @Override
+    @Transactional
+    public void unbind(String cardId) {
+        iIcCardService.unbind(cardId);
+        //TODO ic卡余额转到客户余额
+    }
+
+    @Override
+    public List<IcCardDetailVo> queryCardList(String customerGuid) {
+        List<IcCardDetailVo> cardDetailVos = Lists.newArrayList();
+        Card param = new Card();
+        param.setCustomerGuid(customerGuid);
+        List<Card> select = iIcCardService.select(param);
+        for (Card card : select) {
+            IcCardDetailVo vo = new IcCardDetailVo();
+            BeanUtils.copyProperties(card,vo);
+            cardDetailVos.add(vo);
+        }
+        return cardDetailVos;
+    }
+
+    @Override
+    public List<ProjectVo> queryProjects(List<String> projectGuids) {
+        List<Project> projects = iProjectService.queryProjects(projectGuids);
+        List<ProjectVo> projectVos = Lists.newArrayList();
+        for (Project project : projects) {
+            ProjectVo vo = new ProjectVo();
+            BeanUtils.copyProperties(project,vo);
+            projectVos.add(vo);
+        }
+        return projectVos;
+    }
+}

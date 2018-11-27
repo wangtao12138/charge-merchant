@@ -1,0 +1,104 @@
+package cn.com.cdboost.charge.merchant.dubbo.impl;
+
+import cn.com.cdboost.charge.base.exception.BusinessException;
+import cn.com.cdboost.charge.base.util.UuidUtil;
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.merchant.dao.ProjectMapper;
+import cn.com.cdboost.charge.merchant.dto.ProjectListDto;
+import cn.com.cdboost.charge.merchant.dto.param.ProjectQueryParamDao;
+import cn.com.cdboost.charge.merchant.model.Project;
+import cn.com.cdboost.charge.merchant.service.IProjectService;
+import cn.com.cdboost.charge.merchant.dubbo.ProjectService;
+import cn.com.cdboost.charge.merchant.vo.info.ProjectVo;
+import cn.com.cdboost.charge.merchant.vo.param.ProjectQueryParam;
+import com.alibaba.dubbo.config.annotation.Service;
+import com.google.common.collect.Lists;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+
+import javax.annotation.Resource;
+import java.util.Date;
+import java.util.List;
+
+@Slf4j
+@Service(version = "1.0",retries = -1)
+public class ProjectServiceImpl implements ProjectService {
+    @Autowired
+    private ProjectMapper projectMapper;
+    @Resource
+    private IProjectService iProjectService;
+
+    @Override
+    public PageData queryProjectByPropertyGuid(ProjectQueryParam queryVo) {
+        PageData pageData = new PageData();
+        ProjectQueryParamDao projectQueryParamDao = new ProjectQueryParamDao();
+        List<ProjectListDto> projectListDtos = projectMapper.queryProjectDeviceCount(projectQueryParamDao);
+        pageData.setList(projectListDtos);
+        return pageData;
+    }
+
+    @Override
+    @Transactional
+    public void addProject(ProjectVo queryVo) {
+        Project project = new Project();
+        project.setProjectName(queryVo.getProjectName());
+        List<Project> select = iProjectService.select(project);
+        if (select.size() > 0){
+            throw new BusinessException("站点名称不能重复！");
+        }
+        BeanUtils.copyProperties(queryVo,project);
+        project.setProjectGuid(UuidUtil.getUuid());
+        project.setPrice(queryVo.getBasePrice().add(queryVo.getUpPrice()));
+        iProjectService.insertSelective(project);
+    }
+
+    @Override
+    @Transactional
+    public void updateProject(ProjectVo queryVo) {
+        //判断修改站点名称是否重复
+        List<Project> projects = iProjectService.queryProjectsByCondition(queryVo.getProjectGuid(),queryVo.getProjectName());
+        if (projects.size() > 0){
+            throw new BusinessException("站点名称不能重复！");
+        }
+        Project project = new Project();
+        BeanUtils.copyProperties(queryVo,project);
+        project.setUpdateTime(new Date());
+        iProjectService.updateByPropertyGuid(project);
+    }
+
+    @Override
+    @Transactional
+    public void deleteProjectByProjectGuids(List<String> projectGuids) {
+        iProjectService.batchDelete(projectGuids);
+    }
+
+    @Override
+    public ProjectVo queryProjectDetail(String projectGuid) {
+        Project param = new Project();
+        param.setProjectGuid(projectGuid);
+        Project project = iProjectService.selectOne(param);
+        ProjectVo projectVo = new ProjectVo();
+        BeanUtils.copyProperties(project,projectVo);
+        return projectVo;
+    }
+
+    @Override
+    public PageData<ProjectVo> queryProjects(ProjectQueryParam queryVo) {
+        PageData<Project> projectPageData = iProjectService.queryProjectsPage(queryVo);
+        PageData<ProjectVo> projectVoPageData = new PageData<>();
+        List<ProjectVo> projectVos = Lists.newArrayList();
+        if (!CollectionUtils.isEmpty(projectPageData.getList())){
+            for (Project project : projectPageData.getList()) {
+                ProjectVo vo = new ProjectVo();
+                BeanUtils.copyProperties(project,vo);
+                projectVos.add(vo);
+            }
+        }
+        projectVoPageData.setList(projectVos);
+        projectVoPageData.setTotal(projectPageData.getTotal());
+        return projectVoPageData;
+    }
+}

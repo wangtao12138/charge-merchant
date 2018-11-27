@@ -1,0 +1,402 @@
+package cn.com.cdboost.charge.merchant.dubbo.impl;
+
+import cn.com.cdboost.charge.base.exception.BusinessException;
+import cn.com.cdboost.charge.base.util.DateUtil;
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.merchant.dao.CardListMapper;
+import cn.com.cdboost.charge.merchant.dao.CardMapper;
+import cn.com.cdboost.charge.merchant.dto.IcCardCountDto;
+import cn.com.cdboost.charge.merchant.dto.param.ChargerICCardOptListParam;
+import cn.com.cdboost.charge.merchant.dto.param.ICCardListParam;
+import cn.com.cdboost.charge.merchant.dto.param.IcCardOptParam;
+import cn.com.cdboost.charge.merchant.dto.param.IcCardQueryParam;
+import cn.com.cdboost.charge.merchant.dubbo.IcCardService;
+import cn.com.cdboost.charge.merchant.model.Card;
+import cn.com.cdboost.charge.merchant.model.CardList;
+import cn.com.cdboost.charge.merchant.model.Project;
+import cn.com.cdboost.charge.merchant.service.IIcCardService;
+import cn.com.cdboost.charge.merchant.service.IProjectService;
+import cn.com.cdboost.charge.merchant.vo.dto.IcCardListDto;
+import cn.com.cdboost.charge.merchant.vo.info.*;
+import cn.com.cdboost.charge.merchant.vo.param.ChargerICCardListParam;
+import cn.com.cdboost.charge.merchant.vo.param.IcCardParam;
+import com.alibaba.dubbo.config.annotation.Service;
+import com.alibaba.fastjson.JSON;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
+import com.google.common.collect.Lists;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
+import tk.mybatis.mapper.entity.Condition;
+import tk.mybatis.mapper.entity.Example;
+
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+
+@Slf4j
+@Service(version = "1.0",retries = -1,timeout = 5000)
+public class IcCardServiceImpl implements IcCardService{
+    @Autowired
+    private CardMapper cardMapper;
+    @Autowired
+    private CardListMapper cardListMapper;
+    @Autowired
+    private IProjectService iProjectService;
+    @Autowired
+    private IIcCardService iIcCardService;
+
+    @Override
+    public IcCardCountVo queryIcCount(IcCardParam param) {
+        Card queryParam = new Card();
+        if (!StringUtils.isEmpty(param.getProjectGuid())){
+            queryParam.setProjectGuid(param.getProjectGuid());
+        }
+        if (!StringUtils.isEmpty(param.getMerchantGuid())){
+            queryParam.setMerchantGuid(param.getMerchantGuid());
+        }
+
+        List<Card> cards = iIcCardService.select(queryParam);
+        //总数量
+        Integer totalCount = cards.size();
+        //初始化数量
+        Integer initCount = 0;
+        //使用中数量
+        Integer useCount = 0;
+        //停用数量
+        Integer offCount = 0;
+        //欠费数量
+        Integer arrearageCount = 0;
+        //挂失数量
+        Integer lossCount = 0;
+        for (Card card : cards) {
+            if (card.getCardOwe() == 0){
+                arrearageCount += 1;
+            }else {
+                if (card.getCardState() == 0){
+                    initCount += 1;
+                }else if (card.getCardState() == 1){
+                    useCount += 1;
+                }else if (card.getCardState() == 2){
+                    offCount += 1;
+                }else if (card.getCardState() == 3){
+                    lossCount += 1;
+                }
+            }
+        }
+        IcCardCountVo icCardCountVo = new IcCardCountVo();
+        icCardCountVo.setTotalCount(totalCount);
+        icCardCountVo.setInitCount(initCount);
+        icCardCountVo.setArrearageCount(arrearageCount);
+        icCardCountVo.setLossCount(lossCount);
+        icCardCountVo.setOffCount(offCount);
+        icCardCountVo.setUseCount(useCount);
+        return icCardCountVo;
+    }
+
+    @Override
+    public IcCardDetailVo queryIcDetail(String cardId) {
+        //查询ic卡基础信息
+        Card param = new Card();
+        param.setCardId(cardId);
+        Card card = iIcCardService.selectOne(param);
+        IcCardDetailVo cardDetailVo = new IcCardDetailVo();
+        BeanUtils.copyProperties(card,cardDetailVo);
+        cardDetailVo.setUpdateTime(DateUtil.formatDate(card.getUpdateTime()));
+        cardDetailVo.setCreateTime(DateUtil.formatDate(card.getCreateTime()));
+        //查询ic卡所属站点名称
+        Project projectParam = new Project();
+        projectParam.setProjectGuid(card.getProjectGuid());
+        Project project = iProjectService.selectOne(projectParam);
+        cardDetailVo.setProjectName(project.getProjectName());
+        return cardDetailVo;
+    }
+
+    @Override
+    public PageData<IcCardListDto> queryIcList(IcCardParam param) {
+        PageData<IcCardListDto> pageData = iIcCardService.queryIcList(param);
+        return pageData;
+    }
+
+    @Override
+    @Transactional
+    public void bindingProject(String merchantGuid, String projectGuid, String cardId) throws BusinessException{
+        Card card = new Card();
+        card.setCardId(cardId);
+        Card selectOne = cardMapper.selectOne(card);
+        if (selectOne == null){
+            throw new BusinessException("平台没有该ic卡！");
+        }
+        if (!StringUtils.isEmpty(selectOne.getMerchantGuid())){
+            throw new BusinessException("该卡已被绑定！");
+        }
+        card.setMerchantGuid(merchantGuid);
+        card.setProjectGuid(projectGuid);
+        Condition condition = new Condition(Card.class);
+        Example.Criteria criteria = condition.createCriteria();
+        criteria.andEqualTo("cardId",cardId);
+        cardMapper.updateByConditionSelective(card,condition);
+    }
+
+    @Override
+    @Transactional
+    public void cancelCard(String cardId) {
+        iIcCardService.cancelCard(cardId);
+        //TODO ic卡上余额转移
+    }
+
+    @Override
+    public void addCard(ChargerICCardAddVo addVo) throws BusinessException {
+        Card card = new Card();
+        card.setCardId(addVo.getCardId());
+        List<Card> select = cardMapper.select(card);
+        if (select.size() > 0){
+            throw new BusinessException("卡号不能重复!");
+        }
+
+        Card card2 = new Card();
+        card2.setCardGuid(addVo.getCardGuid());
+        List<Card> select2 = cardMapper.select(card2);
+        if (select2.size() > 0){
+            throw new BusinessException("uuid不能重复!");
+        }
+
+        BeanUtils.copyProperties(addVo,card);
+        card.setRemainAmount(addVo.getInitAmount());
+        //添加IC卡信息
+        cardMapper.insertSelective(card);
+
+        //添加ic卡账户信息em_d_charging_account_flow
+        /*ChargingAccountFlow chargingAccountFlow = new ChargingAccountFlow();
+        chargingAccountFlow.setAccountId(0);
+        chargingAccountFlow.setBusinessType(22);
+        chargingAccountFlow.setAmount(param.getInitAmount());
+        chargingAccountFlow.setGuid(UuidUtil.getUuid());
+        chargingAccountFlow.setCreateTime(new Date());
+        chargingAccountFlow.setRemark("IC卡建卡预留金额");
+        chargingAccountFlow.setCardId(param.getCardId());
+        chargingAccountFlowMapper.insertSelective(chargingAccountFlow);*/
+    }
+
+    @Override
+    public void addCardList(ChargerICCardListParam listParam) {
+        //调用cardlist存储过程
+        ICCardListParam chargerICCardListParam = new ICCardListParam();
+        chargerICCardListParam.setProjectGuid(listParam.getProjectGuid());
+        chargerICCardListParam.setCardId(listParam.getCardId());
+        cardListMapper.addCardList(chargerICCardListParam);
+        if (chargerICCardListParam.getResult() == 0){
+            log.info("添加下发表失败！");
+        }else if (chargerICCardListParam.getResult() == 1){
+            log.info("添加成功！");
+        }else if (chargerICCardListParam.getResult() == 2){
+            log.info("IC卡所属站点不存在！");
+        }else if (chargerICCardListParam.getResult() == 3){
+            log.info("项目下无设备！");
+        }else if (chargerICCardListParam.getResult() == 4){
+            log.info("ic卡已不存在！");
+        }else if (chargerICCardListParam.getResult() == 5){
+            log.info("其他错误！");
+        }
+    }
+
+    @Override
+    public void editCard(ChargerICCardEditVo editVo) {
+        //修改ic卡表
+        Card card = new Card();
+        BeanUtils.copyProperties(editVo,card);
+        card.setCustomerName(editVo.getCustomerName());
+        card.setUpdateTime(new Date());
+        Condition condition = new Condition(Card.class);
+        Condition.Criteria criteria = condition.createCriteria();
+        criteria.andEqualTo("cardId",card.getCardId());
+        cardMapper.updateByConditionSelective(card,condition);
+    }
+
+    @Override
+    public void editCardList(ChargerICCardListParam listParam) {
+        ICCardListParam chargerICCardListParam = new ICCardListParam();
+        chargerICCardListParam.setProjectGuid(listParam.getProjectGuid());
+        chargerICCardListParam.setCardId(listParam.getCardId());
+        //调用cardlist存储过程
+        cardListMapper.addCardList(chargerICCardListParam);
+        if (chargerICCardListParam.getResult() == 0){
+            log.info("修改下发表失败！");
+        }else if (chargerICCardListParam.getResult() == 1){
+            log.info("修改成功！");
+        }else if (chargerICCardListParam.getResult() == 2){
+            log.info("IC卡所属站点不存在！");
+        }else if (chargerICCardListParam.getResult() == 3){
+            log.info("项目下无设备！");
+        }else if (chargerICCardListParam.getResult() == 4){
+            log.info("ic卡已不存在！");
+        }else if (chargerICCardListParam.getResult() == 5){
+            log.info("其他错误！");
+        }
+    }
+
+    @Override
+    public void deleteCards(List<String> cardIds) throws BusinessException{
+        //删除充电IC卡
+        Condition condition = new Condition(Card.class);
+        Condition.Criteria criteria = condition.createCriteria();
+        criteria.andIn("cardId",cardIds);
+        List<Card> chargingCards = cardMapper.selectByCondition(condition);
+        Iterator<Card> it = chargingCards.iterator();
+        String message = "";
+        while(it.hasNext()){
+            Card chargingCard = it.next();
+            if (chargingCard.getRemainAmount().compareTo(BigDecimal.ZERO) != 0){
+                it.remove();
+                cardIds.remove(chargingCard.getCardId());
+                message = "所选卡还有余额！";
+            }
+        }
+        if (!CollectionUtils.isEmpty(cardIds)){
+            criteria.andIn("cardId",cardIds);
+            cardMapper.deleteByCondition(condition);
+        }
+        if (!"".equals(message)){
+            throw new BusinessException(message);
+        }
+    }
+
+    @Override
+    public void deleteCardList(List<String> cardIds) {
+        //删除充电IC卡
+        Condition condition = new Condition(Card.class);
+        Condition.Criteria criteria = condition.createCriteria();
+        criteria.andIn("cardId",cardIds);
+        List<Card> chargingCards = cardMapper.selectByCondition(condition);
+        Iterator<Card> it = chargingCards.iterator();
+        while(it.hasNext()){
+            Card chargingCard = it.next();
+            if (chargingCard.getRemainAmount().compareTo(BigDecimal.ZERO) != 0){
+                it.remove();
+                cardIds.remove(chargingCard.getCardId());
+            }
+        }
+        if (!CollectionUtils.isEmpty(cardIds)){
+            //调用cardlist存储过程
+            ChargerICCardOptListParam param = new ChargerICCardOptListParam();
+            List<IcCardOptParam> optParams = Lists.newArrayList();
+            for (String cardId: cardIds){
+                IcCardOptParam optParam = new IcCardOptParam();
+                optParam.setCard_id(cardId);
+                optParams.add(optParam);
+            }
+            param.setCardIds(JSON.toJSONString(optParams));
+            param.setOptFlag(3);
+            cardListMapper.optCardList(param);
+            if (param.getResult() == 0){
+                log.info("删除下发表失败！");
+            }else if (param.getResult() == 1){
+                log.info("删除成功！");
+            }else if (param.getResult() == 3){
+                log.info("项目下无设备！");
+            }else if (param.getResult() == 4){
+                log.info("ic卡下发表json 解析错误");
+            }else if (param.getResult() == 5){
+                log.info("其他错误！");
+            }
+        }
+    }
+
+    @Override
+    public void offOnCard(List<String> cardIds, Integer onOrOff) {
+        Card card = new Card();
+        if (onOrOff == 0){
+            card.setCardState(2);
+        }else if (onOrOff == 1){
+            card.setCardState(1);
+        }
+        card.setUpdateTime(new Date());
+        //批量修改ic卡状态
+        Condition condition = new Condition(Card.class);
+        Condition.Criteria criteria = condition.createCriteria();
+        criteria.andIn("cardId",cardIds);
+        cardMapper.updateByConditionSelective(card, condition);
+    }
+
+    @Override
+    public void offOnCardList(List<String> cardIds, Integer onOrOff) {
+        ChargerICCardOptListParam optListParam = new ChargerICCardOptListParam();
+        if (onOrOff == 0){
+            //调用cardlist存储过程
+            List<IcCardOptParam> optParams = Lists.newArrayList();
+            for (String cardId: cardIds){
+                IcCardOptParam optParam = new IcCardOptParam();
+                optParam.setCard_id(cardId);
+                optParams.add(optParam);
+            }
+            optListParam.setCardIds(JSON.toJSONString(optParams));
+            optListParam.setOptFlag(2);
+            cardListMapper.optCardList(optListParam);
+        }else if (onOrOff == 1){
+            //调用cardlist存储过程
+            List<IcCardOptParam> optParams = Lists.newArrayList();
+            for (String cardId: cardIds){
+                IcCardOptParam optParam = new IcCardOptParam();
+                optParam.setCard_id(cardId);
+                optParams.add(optParam);
+            }
+            optListParam.setCardIds(JSON.toJSONString(optParams));
+            optListParam.setOptFlag(1);
+            cardListMapper.optCardList(optListParam);
+        }
+        if (optListParam.getResult() == 0){
+            log.info("操作下发表失败！");
+        }else if (optListParam.getResult() == 1){
+            log.info("操作成功！");
+        }else if (optListParam.getResult() == 3){
+            log.info("项目下无设备！");
+        }else if (optListParam.getResult() == 4){
+            log.info("json 解析错误");
+        }else if (optListParam.getResult() == 5){
+            log.info("其他错误！");
+        }
+    }
+
+    @Override
+    public PageData<CardSendListVo> queryIcSendList(IcCardParam param) {
+        PageData<CardSendListVo> respPageData = new PageData<>();
+        Condition condition = new Condition(CardList.class);
+        Example.Criteria criteria = condition.createCriteria();
+        if (!StringUtils.isEmpty(param.getCardId())){
+            criteria.andLike("cardId","%" + param.getCardId() + "%");
+        }
+        if (!StringUtils.isEmpty(param.getCommNo())){
+            criteria.andLike("commNo","%" + param.getCommNo() + "%");
+        }
+        if (!StringUtils.isEmpty(param.getDeviceNo())){
+            criteria.andLike("deviceNo","%" + param.getDeviceNo() + "%");
+        }
+        criteria.andEqualTo("projectGuid",param.getProjectGuid());
+        criteria.andNotEqualTo("state",-1);
+        if (param.getSendFlag() != null){
+            criteria.andEqualTo("sendFlag",param.getSendFlag());
+        }
+        PageHelper.startPage(param.getPageNumber(),param.getPageSize(),"id desc");
+        List<CardList> cardLists = cardListMapper.selectByCondition(condition);
+        //设置分页总数
+        PageInfo pageInfo = new PageInfo(cardLists);
+        respPageData.setTotal(pageInfo.getTotal());
+
+        List<CardSendListVo> cardListInfos = Lists.newArrayList();
+        for (CardList cardList : cardLists) {
+            CardSendListVo cardListInfo = new CardSendListVo();
+            BeanUtils.copyProperties(cardList, cardListInfo);
+            if (cardList.getUpdateTime() != null){
+                cardListInfo.setUpdateTime(DateUtil.formatDate(cardList.getUpdateTime()));
+            }
+            cardListInfos.add(cardListInfo);
+            respPageData.setList(cardListInfos);
+        }
+        return respPageData;
+    }
+}

@@ -1,0 +1,15 @@
+package cn.com.cdboost.charge.merchant.vo.info;
+
+import io.swagger.annotations.ApiModel;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.io.Serializable;
+
+@Getter
+@Setter
+@ApiModel(value = "MerchantInfoVo", description = "商户对象")
+public class MerchantInfoVo  implements Serializable {
+
+    private static final long serialVersionUID = 2019800750228335471L;
+}

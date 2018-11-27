@@ -1,0 +1,648 @@
+package cn.com.cdboost.charge.merchant.dubbo.impl;
+
+import cn.com.cdboost.charge.base.constant.DeviceType;
+import cn.com.cdboost.charge.base.exception.BusinessException;
+import cn.com.cdboost.charge.base.util.CNoUtil;
+import cn.com.cdboost.charge.base.util.DateUtil;
+import cn.com.cdboost.charge.base.util.UuidUtil;
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.customer.dubbo.CustomerToMerchantService;
+import cn.com.cdboost.charge.customer.vo.info.CustomerBaseInfo;
+import cn.com.cdboost.charge.customer.vo.info.DeviceLogInfo;
+import cn.com.cdboost.charge.customer.vo.info.DeviceUseDetailedVo;
+import cn.com.cdboost.charge.merchant.common.BaseServiceImpl;
+import cn.com.cdboost.charge.merchant.constant.ChargingEnum;
+import cn.com.cdboost.charge.merchant.dao.CardListMapper;
+import cn.com.cdboost.charge.merchant.dao.ComPayChemeMapper;
+import cn.com.cdboost.charge.merchant.dao.DeviceMapper;
+import cn.com.cdboost.charge.merchant.dto.ChargingDeviceDto;
+import cn.com.cdboost.charge.merchant.dto.ChargingDevicePortDto;
+import cn.com.cdboost.charge.merchant.dto.MonitorDeviceDaoDto;
+import cn.com.cdboost.charge.merchant.dto.MonitorDeviceTotalDto;
+import cn.com.cdboost.charge.merchant.dto.param.ChargerDeviceParam;
+import cn.com.cdboost.charge.merchant.dto.param.ChargerDeviceQueryDaoParam;
+import cn.com.cdboost.charge.merchant.dto.param.DeviceQueryParam;
+import cn.com.cdboost.charge.merchant.dto.param.ICCardListParam;
+import cn.com.cdboost.charge.merchant.dubbo.DeviceService;
+import cn.com.cdboost.charge.merchant.dubbo.WebChargingDeviceService;
+import cn.com.cdboost.charge.merchant.model.CardList;
+import cn.com.cdboost.charge.merchant.model.ComPayCheme;
+import cn.com.cdboost.charge.merchant.model.Device;
+import cn.com.cdboost.charge.merchant.vo.dto.ChargingCountByRunState;
+import cn.com.cdboost.charge.merchant.vo.dto.MonitorDeviceDto;
+import cn.com.cdboost.charge.merchant.vo.info.*;
+import cn.com.cdboost.charge.merchant.vo.param.ChargerDeviceQueryParam;
+import cn.com.cdboost.charge.merchant.vo.param.DeviceParam;
+import cn.com.cdboost.charge.merchant.vo.param.WithdrawCashListParam;
+import cn.com.cdboost.charge.user.constant.DictItemConstant;
+import cn.com.cdboost.charge.user.dto.info.DictItemInfo;
+import cn.com.cdboost.charge.user.dubbo.DictService;
+import cn.com.cdboost.charge.user.dubbo.OrgService;
+import com.alibaba.dubbo.config.annotation.Reference;
+import com.alibaba.dubbo.config.annotation.Service;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
+import com.google.common.base.Function;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableListMultimap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimaps;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
+import tk.mybatis.mapper.entity.Condition;
+import tk.mybatis.mapper.entity.Example;
+
+import javax.annotation.Nullable;
+import java.math.BigDecimal;
+import java.util.*;
+
+/**
+ * @author wt
+ * @desc
+ * @create in  2018/10/10
+ **/
+@Slf4j
+@Service(version = "1.0", retries = -1,timeout = 5000)
+public class WebChargingDeviceServiceImpl extends BaseServiceImpl<Device> implements WebChargingDeviceService {
+    @Autowired
+    DeviceMapper deviceMapper;
+
+    @Reference(version = "1.0")
+    DictService dictItemService;
+
+    @Autowired
+    CardListMapper CardListMapper;
+
+    @Reference(version = "1.0")
+    OrgService orgService;
+
+    @Reference(version = "1.0")
+    CustomerToMerchantService customerToMerchantService;
+
+    @Autowired
+    ComPayChemeMapper comPayChemeMapper;
+
+    @Autowired
+    DeviceService deviceService;
+
+
+    @Override
+    @Transactional
+    public boolean editDevice(DeviceVo chargingDevice, Integer userId) {
+        //修改设备
+        chargingDevice.setUpdateUserId(userId.longValue());
+        chargingDevice.setUpdateTime(DateUtil.formatDate(new Date()));
+
+        chargingDevice.setUpdateUserId(userId.longValue());
+        //创建总表cno
+        if(!StringUtils.isEmpty(chargingDevice.getMeterNo())){
+
+            String meterCno = CNoUtil.CreateCNo(DeviceType.ELECTRIC_METER.getCode(), chargingDevice.getMeterNo());
+            chargingDevice.setMeterCno(meterCno);
+        }
+
+        Device device = new Device();
+        BeanUtils.copyProperties(chargingDevice, device);
+        int n = deviceMapper.editDevice(device);
+        if (n > 0) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    @Override
+    public Integer editCardList(DeviceVo chargingDevice, String oldProjectGuid) {
+        //调用cardlist存储过程
+        ICCardListParam chargerICCardListParam = new ICCardListParam();
+        chargerICCardListParam.setProjectGuid(chargingDevice.getProjectGuid());
+        chargerICCardListParam.setDeviceNo(chargingDevice.getDeviceNo());
+        chargerICCardListParam.setCommNo(chargingDevice.getCommNo());
+        chargerICCardListParam.setOldProjectGuid(oldProjectGuid);
+        CardListMapper.addDevCardList(chargerICCardListParam);
+        return chargerICCardListParam.getResult();
+    }
+
+    @Override
+    public void queryHeartStep(String id, String commNo) {
+        if (StringUtils.isEmpty(commNo)) {
+            throw new BusinessException("commNo不能为空");
+        }
+        //todo 改为mq
+       /* AFN23Object afn23Object = new AFN23Object(UuidUtil.getUuid(),"23","999999999","0042475858fffaa",commNo,
+                sessionId,null,"0","");
+        //下发指令
+        int result =  ClientManager.sendAFN23Msg(afn23Object);
+        if (result != 1) {
+            throw new BusinessException("查询充电桩心跳间隔中间件指令发送失败");
+        }*/
+    }
+
+    @Override
+    public void setHeartStep(String sessionId, ChargeHeartStepVo chargeHeartStepVo) {
+        //todo 改为mq
+        /*AFN23Object afn23Object = new AFN23Object(UuidUtil.getUuid(),"23","999999999","0042475858fffaa",chargeHeartStepVo.getCommNo(),
+                sessionId,null,"1",String.valueOf(chargeHeartStepVo.getHeartStep()));
+        //下发指令
+        int result =  ClientManager.sendAFN23Msg(afn23Object);
+        if (result != 1) {
+            throw new BusinessException("设置充电桩心跳间隔中间件指令发送失败");
+        }*/
+    }
+
+    @Override
+    public void queryThreshold(String sessionId, String commNo, String port) {
+        if (StringUtils.isEmpty(commNo)) {
+            throw new BusinessException("commNo不能为空");
+        }
+        if (StringUtils.isEmpty(port)) {
+            throw new BusinessException("port不能为空");
+        }
+        //todo mq
+      /*  AFN22Object afn22Object = new AFN22Object(UuidUtil.getUuid(),"22","999999999","0042475858FFFFDF",commNo,
+                sessionId,null,Port);
+        //下发指令
+        int result =  ClientManager.sendAFN22Msg(afn22Object);
+        if (result != 1) {
+            throw new BusinessException("查询充电桩阈值中间件指令发送失败");
+        }*/
+    }
+
+    @Override
+    public void setThreshold(String sessionId, ChargeThresholdVo chargeThresholdVo) {
+        //todo mq
+       /* AFN21Object afn21Object = new AFN21Object(UuidUtil.getUuid(),"21","999999999","0042475858fffaa",
+                chargeThresholdVo.getCommNo(),chargeThresholdVo.getPort(),sessionId,null,
+                String.valueOf(chargeThresholdVo.getOverCurrent()),
+                String.valueOf(chargeThresholdVo.getOverVoltage()),
+                String.valueOf(chargeThresholdVo.getUnderVoltage()),
+                String.valueOf(chargeThresholdVo.getUnderCurrent()),
+                String.valueOf(chargeThresholdVo.getUnderCurrentDelay()));
+        //下发指令
+        int result =  ClientManager.sendAFN21Msg(afn21Object);
+        if (result != 1) {
+            throw new BusinessException("设置充电桩阈值中间件指令发送失败");
+        }*/
+    }
+
+    @Override
+    public void offOnCharge(OffOnChargeVo offOnChargeVo) {
+        String errorMsg = "停用充电桩中间件指令成功";
+       /* AFN19Object afn19Object = null;
+        if (offOnChargeVo.getOnOrOff() == 0){// web端停用
+            afn19Object = new AFN19Object(UUID.randomUUID().toString(),
+                    "19",
+                    "999999999",
+                    "0042475858fffaa",
+                    offOnChargeVo.getCommNo(),
+                    "0",
+                    offOnChargeVo.getPort(),
+                    "off",
+                    offOnChargeVo.getSessionId(),
+                    "",
+                    "",
+                    "0",
+                    "2",0,0,"");
+            afn19Object.setNonUseFlag(String.valueOf(offOnChargeVo.getOnOrOff()));
+
+            // web端停电（中间件停电成功会修改为空闲状态，修改为停用只能在回调函数内进行）
+            this.updateRunState(offOnChargeVo.getCommNo(), ChargingEnum.OFF_STATE.getKey(),offOnChargeVo.getPort());
+            //下发数据
+            int result =  ClientManager.sendAFN19Msg(afn19Object);
+            if (result != 1) {
+                errorMsg = "停用充电桩中间件指令失败";
+                throw new BusinessException(errorMsg);
+            }
+        } else if (offOnChargeVo.getOnOrOff() == 1){
+            // web端启用
+            this.updateRunState(offOnChargeVo.getCommNo(), ChargingEnum.FREE_STATE.getKey(),offOnChargeVo.getPort());
+        }else if (offOnChargeVo.getOnOrOff() == -1){// web端停电
+            if (!StringUtil.isEmpty(offOnChargeVo.getChargingGuid())){
+                ChargingUseDetailed chargingUseDetailed = chargingUseDetailedService.queryChargingRecordByChargingGuid(offOnChargeVo.getChargingGuid());
+                if (chargingUseDetailed.getState().equals(ChargeConstant.ChargeState.COMPLETED.getState())){//判断该充电订单是否关闭
+                    throw new BusinessException("该人员已完成充电，请刷新页面！");
+                }
+            }
+            afn19Object = new AFN19Object(UUID.randomUUID().toString(),
+                    "19",
+                    "999999999",
+                    "0042475858fffaa",
+                    offOnChargeVo.getCommNo(),
+                    "0",
+                    offOnChargeVo.getPort(),
+                    "off",
+                    offOnChargeVo.getSessionId(),
+                    "",
+                    "",
+                    "0",
+                    "2",0,0,"");
+            afn19Object.setNonUseFlag(String.valueOf(offOnChargeVo.getOnOrOff()));
+            //下发数据
+            int result =  ClientManager.sendAFN19Msg(afn19Object);
+            if (result != 1) {
+                errorMsg = "停电充电桩中间件指令失败";
+                throw new BusinessException(errorMsg);
+            }
+        }*/
+    }
+
+    @Override
+    public ChargingCountByRunState monitorDeviceCount(ChargerDeviceVo queryVo) {
+        ChargingCountByRunState count = new ChargingCountByRunState();
+        int total = 0;
+        int offlineTotal = 0;
+        //按状态统计设备数量,按状态返回
+        ChargerDeviceParam chargerDeviceParam = new ChargerDeviceParam();
+        BeanUtils.copyProperties(queryVo, chargerDeviceParam);
+        List<MonitorDeviceTotalDto> monitorDeviceTotalDtos = deviceMapper.monitorDeviceCount(chargerDeviceParam);
+        for (MonitorDeviceTotalDto monitorDeviceTotalDto : monitorDeviceTotalDtos) {
+            total += monitorDeviceTotalDto.getCount();
+            if (monitorDeviceTotalDto.getOnline() == 1) {
+                if (monitorDeviceTotalDto.getRunState().equals(ChargingEnum.FREE_STATE.getKey())) {
+                    count.setFreeTotal(monitorDeviceTotalDto.getCount());
+                } else if (monitorDeviceTotalDto.getRunState().equals(ChargingEnum.ON_STATE.getKey())) {
+                    count.setOnTotal(monitorDeviceTotalDto.getCount());
+                } else if (monitorDeviceTotalDto.getRunState().equals(ChargingEnum.OFF_STATE.getKey())) {
+                    count.setOffTotal(monitorDeviceTotalDto.getCount());
+                } else if (monitorDeviceTotalDto.getRunState().equals(ChargingEnum.ERROR_STATE.getKey())) {
+                    count.setErrorTotal(monitorDeviceTotalDto.getCount());
+                }
+            } else if (monitorDeviceTotalDto.getOnline() == 0) {
+                offlineTotal += monitorDeviceTotalDto.getCount();
+            }
+
+        }
+        count.setOfflineTotal(offlineTotal);
+        count.setTotal(total);
+        return count;
+    }
+
+    @Override
+    public PageData monitorDeviceList(ChargerDeviceQueryMerchantVo queryVo) {
+        List<MonitorDeviceDto> monitorDeviceDtos = Lists.newArrayList();
+        Long total = 0L;
+        PageHelper.startPage(queryVo.getPageNumber(), queryVo.getPageSize());
+        ChargerDeviceQueryDaoParam chargerDeviceQueryDaoParam = new ChargerDeviceQueryDaoParam();
+        BeanUtils.copyProperties(queryVo, chargerDeviceQueryDaoParam);
+        List<MonitorDeviceDaoDto> monitorDeviceDtos1 = deviceMapper.monitorDeviceList(chargerDeviceQueryDaoParam);
+        for (MonitorDeviceDaoDto monitorDeviceDaoDto : monitorDeviceDtos1) {
+
+            DeviceUseDetailedVo deviceUseDetailedVo=null;
+            if ("1".equals(queryVo.getRunState())) {
+            DeviceUseDetailedVo deviceUseDetailedVo1 = new DeviceUseDetailedVo();
+            deviceUseDetailedVo1.setChargingPlieGuid(monitorDeviceDaoDto.getChargingPlieGuid());
+            if (queryVo.getPayCategory() != null && !"0".equals(queryVo.getPayCategory())) {
+                deviceUseDetailedVo1.setPayCategory(Integer.valueOf(queryVo.getPayCategory()));
+            }
+
+                deviceUseDetailedVo1.setState(0);
+
+                deviceUseDetailedVo = customerToMerchantService.queryDeviceUseDetailed(deviceUseDetailedVo1);
+            }
+            if (deviceUseDetailedVo != null) {
+
+                monitorDeviceDaoDto.setStartTime(DateUtil.formatDate(deviceUseDetailedVo.getStartTime()));
+                monitorDeviceDaoDto.setUseTime(deviceUseDetailedVo.getUseTime());
+                monitorDeviceDaoDto.setChargingTime(deviceUseDetailedVo.getChargingTime());
+                monitorDeviceDaoDto.setChargingWay(deviceUseDetailedVo.getChargingWay());
+                monitorDeviceDaoDto.setDeductMoney(deviceUseDetailedVo.getDeductMoney());
+                monitorDeviceDaoDto.setRemainAmount(deviceUseDetailedVo.getAfterRemainAmount());
+                monitorDeviceDaoDto.setChargingGuid(deviceUseDetailedVo.getChargingGuid());
+                monitorDeviceDaoDto.setChargingPower(deviceUseDetailedVo.getChargingPower());
+                monitorDeviceDaoDto.setUsePower(deviceUseDetailedVo.getUsePower());
+                monitorDeviceDaoDto.setPayCategory(deviceUseDetailedVo.getPayCategory());
+                monitorDeviceDaoDto.setOpenNo(deviceUseDetailedVo.getOpenNo());
+                monitorDeviceDaoDto.setOpenMeans(deviceUseDetailedVo.getOpenMeans());
+
+                ComPayCheme comPayCheme = new ComPayCheme();
+                comPayCheme.setSchemeGuid(deviceUseDetailedVo.getSchemeGuid());
+                comPayCheme = comPayChemeMapper.selectOne(comPayCheme);
+
+                monitorDeviceDaoDto.setMaxPower(comPayCheme.getMaxPower());
+                monitorDeviceDaoDto.setSchemeMoney(comPayCheme.getRealMoney());
+                monitorDeviceDaoDto.setSchememTime(comPayCheme.getChargingTime());
+                monitorDeviceDaoDto.setChargingCnt(comPayCheme.getChargingCnt());
+
+                Integer devLogId = deviceUseDetailedVo.getDevLogId();
+                List<DeviceLogInfo> deviceLogInfos = customerToMerchantService.batchQueryByIds(new ArrayList<>(devLogId));
+
+
+                DeviceLogInfo deviceLogInfo = deviceLogInfos.get(0);
+                monitorDeviceDaoDto.setPower(deviceLogInfo.getPower());
+                monitorDeviceDaoDto.setVoltage(deviceLogInfo.getVoltage());
+                monitorDeviceDaoDto.setCurrent(deviceLogInfo.getCurrent());
+                monitorDeviceDaoDto.setPercent(deviceLogInfo.getChargingPercent());
+                monitorDeviceDaoDto.setRemainTime(deviceLogInfo.getRemainTime());
+                monitorDeviceDaoDto.setDevTemperature(deviceLogInfo.getDevTemperature());
+
+
+                CustomerBaseInfo customerBaseInfo = customerToMerchantService.queryByCustomerGuid(deviceUseDetailedVo.getCustomerGuid());
+
+                monitorDeviceDaoDto.setCustomerName(customerBaseInfo.getCustomerName());
+                monitorDeviceDaoDto.setCarCategory(customerBaseInfo.getCarCategory());
+
+            }
+
+        }
+
+        PageInfo pageInfo = new PageInfo(monitorDeviceDtos1);
+        total += pageInfo.getTotal();
+
+        //通过扣除费用判断充值方式
+        for (MonitorDeviceDaoDto monitorDeviceDto : monitorDeviceDtos1) {
+            //设置充电剩余时长 单位(分钟)
+            if (monitorDeviceDto.getRunState().equals(ChargingEnum.ON_STATE.getKey())) {
+                if (monitorDeviceDto.getChargingTime() != null && monitorDeviceDto.getChargingWay() != null) {
+                    if (monitorDeviceDto.getChargingWay() == 1) {
+                        Integer chargingTime = monitorDeviceDto.getChargingTime();
+                        Integer remainTime = chargingTime * 60 - monitorDeviceDto.getUseTime();
+                        if (remainTime < 0) {
+                            remainTime = 0;
+                        }
+                        monitorDeviceDto.setRemainTime(BigDecimal.valueOf(remainTime));
+                    }
+                }
+            }
+            MonitorDeviceDto monitorDeviceDto1 = new MonitorDeviceDto();
+            BeanUtils.copyProperties(monitorDeviceDto, monitorDeviceDto1);
+            monitorDeviceDtos.add(monitorDeviceDto1);
+        }
+        queryVo.setTotal(total);
+        PageData pageData=new PageData();
+        pageData.setList(monitorDeviceDtos);
+        pageData.setTotal(total);
+        return pageData;
+    }
+
+    @Override
+    public CurveQueryInfo queryCurve(String sessionId, String chargingPlieGuid, String chargingGuid, Integer queryFlag) {
+        DeviceVo chargingDevice = deviceService.queryByChargingPlieGuid(chargingPlieGuid);
+        List<DeviceLogInfo> chargingDevlogs = Lists.newArrayList();
+        CurveQueryInfo curveQueryInfo = new CurveQueryInfo();
+
+        if (chargingDevice.getRunState().equals(ChargingEnum.ON_STATE.getKey())){
+            //查询该设备的记录
+            chargingDevlogs = customerToMerchantService.queryCurve(chargingPlieGuid,chargingGuid);
+        }else {
+            //判断是监控页面还是统计页面  1--监控页曲线；2--统计页曲线
+            if (queryFlag == 1){
+                return curveQueryInfo;
+            }else if (queryFlag == 2) {
+                //查询该设备的记录
+                chargingDevlogs = customerToMerchantService.queryCurve(chargingPlieGuid, chargingGuid);
+            }
+        }
+
+        //设置横坐标
+        List<String> xData = Lists.newArrayList();
+        //功率纵坐标
+        List<Float> yPowerData = Lists.newArrayList();
+        //电流纵坐标
+        List<Float>yCurrentData = Lists.newArrayList();
+        //电压纵坐标
+        List<Float>yVoltageData = Lists.newArrayList();
+        for (DeviceLogInfo chargingDevlog:chargingDevlogs){
+            if (chargingDevlog.getCreateTime() != null){
+                xData.add(DateUtil.formatDate(chargingDevlog.getCreateTime()).substring(11,16));
+            }
+            yPowerData.add(chargingDevlog.getPower().floatValue());
+            yCurrentData.add(chargingDevlog.getCurrent().floatValue());
+            yVoltageData.add(chargingDevlog.getVoltage().floatValue());
+        }
+        //设置返回对象
+        curveQueryInfo.setXData(xData);
+        curveQueryInfo.setYCurrentData(yCurrentData);
+        curveQueryInfo.setYPowerData(yPowerData);
+        curveQueryInfo.setYVoltageData(yVoltageData);
+
+        return curveQueryInfo;
+    }
+
+
+    @Override
+    public PageData withdrawCashList(WithdrawCashListParam withdrawCashListDto) {
+       /* PageHelper.startPage(withdrawCashListDto.getPageNumber(),withdrawCashListDto.getPageSize());
+        List<WithdrawCashListInfo> withdrawCashListInfo = chargingWithdrawCashMapper.withdrawCashList(withdrawCashListDto);
+        PageInfo pageInfo =new PageInfo(withdrawCashListInfo);
+        return pageInfo;*/
+        return null;
+    }
+
+    @Override
+    public ChargingDeviceVo queryByChargingPlieGuid(String chargingPlieGuid) {
+        Device param = new Device();
+        param.setChargingPlieGuid(chargingPlieGuid);
+
+        Device device = deviceMapper.selectOne(param);
+        ChargingDeviceVo chargingDeviceVo = new ChargingDeviceVo();
+        BeanUtils.copyProperties(device, chargingDeviceVo);
+        return chargingDeviceVo;
+    }
+
+    public Device queryByDeviceNo(String deviceNo, String port) {
+        Device param = new Device();
+        param.setDeviceNo(deviceNo);
+        param.setPort(port);
+        param.setIsDel(1);
+        return deviceMapper.selectOne(param);
+    }
+
+    @Override
+    public ChargingDeviceVo queryDeviceDetial(String deviceNo) {
+        Device chargingDevice = this.queryByDeviceNo(deviceNo, "1");
+        //查询设备基础信息详情
+        ChargingDeviceDto chargingDeviceDto = deviceMapper.queryDeviceDetial(chargingDevice.getChargingPlieGuid());
+        //查询字典表通信状态
+        if (chargingDeviceDto.getComMethod() != null) {
+            DictItemInfo dictItem = dictItemService.findByCodeAndValue(DictItemConstant.DictCodeConstant.COMMOTHED.getDictCode(), chargingDeviceDto.getComMethod().toString());
+            chargingDeviceDto.setComMethodName(dictItem.getDictItemName());
+        }
+        List<String> deviceNos = Lists.newArrayList();
+        deviceNos.add(deviceNo);
+        List<ChargingDevicePortDto> chargingDevicePortDtos = deviceMapper.deviceAndPortList(deviceNos);
+
+        for (ChargingDevicePortDto chargingDevicePortDto : chargingDevicePortDtos) {
+            if ("1".equals(chargingDevicePortDto.getPort())) {
+                chargingDeviceDto.setRunState1(chargingDevicePortDto.getRunState());
+            } else if ("2".equals(chargingDevicePortDto.getPort())) {
+                chargingDeviceDto.setRunState2(chargingDevicePortDto.getRunState());
+            }
+        }
+        ChargingDeviceVo chargingDeviceVo = new ChargingDeviceVo();
+        BeanUtils.copyProperties(chargingDeviceDto, chargingDeviceVo);
+        return chargingDeviceVo;
+    }
+
+    @Override
+    @Transactional
+    public void deleteCardList(List<String> deviceNos) {
+        Condition condition2 = new Condition(CardList.class);
+        Example.Criteria criteria2 = condition2.createCriteria();
+        criteria2.andIn("deviceNo", deviceNos);
+        CardListMapper.deleteByCondition(condition2);
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteDevice(List<String> deviceNos, Integer userId) {
+        for (String deviceNo : deviceNos) {
+            Device device = new Device();
+            device.setDeviceNo(deviceNo);
+            device.setRunState(1);
+            List<Device> select = deviceMapper.select(device);
+            if (select.size() > 0) {
+                throw new BusinessException("不能删除充电中的设备");
+            }
+        }
+        Device device = new Device();
+        //设置为删除状态
+        device.setIsDel(0);
+        device.setUpdateUserId(userId.longValue());
+        device.setUpdateTime(new Date());
+        //删除设备
+        Condition condition = new Condition(Device.class);
+        Example.Criteria criteria = condition.createCriteria();
+        criteria.andIn("deviceNo", deviceNos);
+        int i = deviceMapper.updateByConditionSelective(device, condition);
+        if (i > 0) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    @Override
+    public void addCardList(DeviceParam chargingDevice) {
+        //调用cardlist存储过程
+        ICCardListParam chargerICCardListParam = new ICCardListParam();
+        chargerICCardListParam.setProjectGuid(chargingDevice.getProjectGuid());
+        chargerICCardListParam.setDeviceNo(chargingDevice.getDeviceNo());
+        chargerICCardListParam.setCommNo(chargingDevice.getCommNo());
+        CardListMapper.addDevCardList(chargerICCardListParam);
+    }
+
+    @Override
+    @Transactional
+    public void addDevice(DeviceParam chargingDevice, Integer userId) throws BusinessException {
+        Device device = new Device();
+        BeanUtils.copyProperties(chargingDevice, device);
+        //根据deviceNo查询数据库
+        Device queryVo = new Device();
+        queryVo.setDeviceNo(device.getDeviceNo());
+
+        List<Device> list = deviceMapper.select(queryVo);
+
+        Device queryVo1 = new Device();
+        queryVo1.setCommNo(device.getCommNo());
+        List<Device> list1 = deviceMapper.select(queryVo1);
+
+
+        //判断是否已存在此deviceNo
+        if (list.size() > 0||list1.size()>0) {
+            for (Device device1 : list) {
+                if (device1.getIsDel() == 1) {
+                    throw new BusinessException("设备编号不能重复");
+                }
+            }
+            for (Device device1 : list1) {
+                if (device1.getIsDel() == 1) {
+                    throw new BusinessException("通信编号不能重复");
+                }
+            }
+        }
+        //创建总表cno
+        if(!StringUtils.isEmpty(device.getMeterNo())){
+            String meterCno = CNoUtil.CreateCNo(DeviceType.ELECTRIC_METER.getCode(), device.getMeterNo());
+            device.setMeterCno(meterCno);
+        }
+        device.setCreateUserId(userId.longValue());
+        device.setChargingPlieGuid(UuidUtil.getUuid());
+        device.setOnline(1);
+        device.setPort("1");
+        //数据库写入1号端口
+        deviceMapper.insertSelective(device);
+        device.setId(null);
+        device.setPort("2");
+        device.setChargingPlieGuid(UuidUtil.getUuid());
+        //数据库写入2号端口
+        deviceMapper.insertSelective(device);
+    }
+
+    @Override
+    public PageData deviceList(ChargerDeviceQueryParam queryVo, Integer userId) {
+        List<Long> dataOrgNos = orgService.queryDataOrgList(userId);
+
+        DeviceQueryParam deviceQueryParam = new DeviceQueryParam();
+        BeanUtils.copyProperties(queryVo, deviceQueryParam);
+
+        if ("1".equals(queryVo.getNodeType())) {
+
+            String orgNo = queryVo.getNodeId();
+            List<Long> childOrgNos = orgService.queryChildren(Long.valueOf(orgNo));
+            dataOrgNos.retainAll(childOrgNos);
+        }
+        deviceQueryParam.setOrgNoList(dataOrgNos);
+
+        //分页查询所有设备
+        Integer pageIndex = (queryVo.getPageNumber() - 1) * queryVo.getPageSize();
+        deviceQueryParam.setPageNumber(pageIndex);
+        List<ChargingDeviceDto> chargingDeviceDtos = deviceMapper.deviceList(deviceQueryParam);
+        List<String> deviceNos = Lists.newArrayList();
+        for (ChargingDeviceDto chargingDeviceDto : chargingDeviceDtos) {
+            deviceNos.add(chargingDeviceDto.getDeviceNo());
+        }
+
+        //查字典表
+        List<DictItemInfo> dictCode = dictItemService.queryDictItemList(DictItemConstant.DictCodeConstant.COMMOTHED.getDictCode());
+
+        // 转map
+        Map<String, String> dictMap = new HashMap<>();
+        for (DictItemInfo dictItem : dictCode) {
+            dictMap.put(dictItem.getDictItemValue(), dictItem.getDictItemName());
+        }
+
+        //赋值给前端需要的对象
+        for (ChargingDeviceDto chargingDeviceDto : chargingDeviceDtos) {
+            String comMethodName = dictMap.get(String.valueOf(chargingDeviceDto.getComMethod()));
+            chargingDeviceDto.setComMethodName(comMethodName);
+        }
+        //查询设备下的所有端口
+        if (CollectionUtils.isEmpty(deviceNos)) {//判断是否有设备
+            return null;
+        }
+        List<ChargingDevicePortDto> chargingDevicePortDtos = deviceMapper.deviceAndPortList(deviceNos);
+        ImmutableListMultimap<String, ChargingDevicePortDto> multimap = Multimaps.index(chargingDevicePortDtos, new Function<ChargingDevicePortDto, String>() {
+            @Nullable
+            @Override
+            public String apply(@Nullable ChargingDevicePortDto chargingDeviceDto) {
+                return chargingDeviceDto.getDeviceNo();
+            }
+        });
+        List<ChargingDeviceVo> chargingDeviceVos = Lists.newArrayList();
+        for (ChargingDeviceDto chargingDeviceDto : chargingDeviceDtos) {
+            ImmutableList<ChargingDevicePortDto> chargingDevicePortDtos1 = multimap.get(chargingDeviceDto.getDeviceNo());
+            for (ChargingDevicePortDto chargingDevicePortDto : chargingDevicePortDtos1) {
+                if ("1".equals(chargingDevicePortDto.getPort())) {
+                    chargingDeviceDto.setRunState1(chargingDevicePortDto.getRunState());
+                } else if ("2".equals(chargingDevicePortDto.getPort())) {
+                    chargingDeviceDto.setRunState2(chargingDevicePortDto.getRunState());
+                }
+            }
+            ChargingDeviceVo chargingDeviceVo = new ChargingDeviceVo();
+            BeanUtils.copyProperties(chargingDeviceDto, chargingDeviceVo);
+            chargingDeviceVos.add(chargingDeviceVo);
+        }
+        //查询总数
+        Integer total = deviceMapper.queryTotal(deviceQueryParam);
+        queryVo.setTotal(total.longValue());
+
+        PageData pageData=new PageData();
+        pageData.setTotal(Long.valueOf(total));
+        pageData.setList(chargingDeviceVos);
+        return pageData;
+    }
+}

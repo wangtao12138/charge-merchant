@@ -1,0 +1,23 @@
+package cn.com.cdboost.charge.merchant.dubbo;
+
+import cn.com.cdboost.charge.base.exception.BusinessException;
+import cn.com.cdboost.charge.merchant.vo.dto.ProjectQueryParam;
+import cn.com.cdboost.charge.merchant.vo.dto.ProjectTreeInfo;
+import cn.com.cdboost.charge.merchant.vo.dto.ProjectTreeParam;
+
+import java.util.List;
+
+/**
+ * 树形服务接口
+ */
+public interface TreeService {
+    /**
+     * 项目树模糊查询
+     * @return
+     * @throws BusinessException
+     */
+    List<ProjectTreeInfo> projectfuzzyQueryTree(ProjectTreeParam projectTreeParam) throws BusinessException;
+    List<ProjectTreeInfo> projectTreeMainSubTree(ProjectQueryParam projectQueryParam);
+    List<ProjectTreeInfo> queryProjectTree(Integer userId);
+
+}

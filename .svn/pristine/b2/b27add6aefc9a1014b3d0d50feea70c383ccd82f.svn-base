@@ -1,0 +1,90 @@
+package cn.com.cdboost.charge.merchant.service.impl;
+
+
+import cn.com.cdboost.charge.merchant.common.BaseServiceImpl;
+import cn.com.cdboost.charge.merchant.constant.DeviceConstant;
+import cn.com.cdboost.charge.merchant.dao.DeviceMapper;
+import cn.com.cdboost.charge.merchant.model.Device;
+import cn.com.cdboost.charge.merchant.service.IDeviceService;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceVo;
+import cn.com.cdboost.charge.merchant.vo.param.DevicePageQueryParam;
+import com.github.pagehelper.PageHelper;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import tk.mybatis.mapper.entity.Condition;
+import tk.mybatis.mapper.entity.Example;
+
+import java.util.List;
+
+
+@Service
+public class IDeviceServiceImpl extends BaseServiceImpl<Device> implements IDeviceService {
+    @Autowired
+    private DeviceMapper deviceMapper;
+
+    @Override
+    public List<Device> queryDevicesByCondition(DevicePageQueryParam queryVo) {
+        Condition condition = new Condition(Device.class);
+        Example.Criteria criteria = condition.createCriteria();
+        if(!StringUtils.isEmpty(queryVo.getProjectGuid())) {
+            criteria.andEqualTo("projectGuid", queryVo.getProjectGuid());
+        }
+        if(!StringUtils.isEmpty(queryVo.getMerchantGuid())) {
+            criteria.andEqualTo("merchantGuid", queryVo.getMerchantGuid());
+        }
+        criteria.andEqualTo("isDel",DeviceConstant.IsDel.NOTDEL.getStatus());
+        if (!StringUtils.isEmpty(queryVo.getDeviceNo())){
+            criteria.andLike("deviceNo","%"+queryVo.getDeviceNo()+"%");
+        }
+        // 设置分页信息
+        if (queryVo.getPageNumber() != null){
+            PageHelper.startPage(queryVo.getPageNumber(),queryVo.getPageSize() * 2,"id desc");
+        }
+        List<Device> devices = deviceMapper.selectByCondition(condition);
+        return devices;
+    }
+
+    @Override
+    public void updateByChargingPlieGuid(DeviceVo vo) {
+        Device device = new Device();
+        BeanUtils.copyProperties(vo,device);
+        Condition condition = new Condition(Device.class);
+        Example.Criteria criteria = condition.createCriteria();
+        criteria.andEqualTo("deviceNo",vo.getDeviceNo());
+        deviceMapper.updateByConditionSelective(device,condition);
+    }
+
+    @Override
+    public void updateByDeviceNo(DeviceVo vo) {
+        Device device = new Device();
+        device.setDeviceNo(vo.getDeviceNo());
+        device.setMerchantGuid(vo.getMerchantGuid());
+        device.setProjectGuid(vo.getProjectGuid());
+        Condition condition = new Condition(Device.class);
+        Example.Criteria criteria = condition.createCriteria();
+        criteria.andEqualTo("deviceNo",vo.getDeviceNo());
+        deviceMapper.updateByConditionSelective(device,condition);
+    }
+
+    @Override
+    public void batchDelete(List<String> deviceNos) {
+        Condition condition = new Condition(Device.class);
+        Example.Criteria criteria = condition.createCriteria();
+        criteria.andIn("deviceNo",deviceNos);
+        Device device = new Device();
+        device.setIsDel(DeviceConstant.IsDel.DEL.getStatus());
+        deviceMapper.updateByConditionSelective(device,condition);
+    }
+
+    @Override
+    public List<Device> queryDevices(List<String> chargingPlieGuids) {
+        Condition condition = new Condition(Device.class);
+        Example.Criteria criteria = condition.createCriteria();
+        criteria.andEqualTo("isDel",DeviceConstant.IsDel.NOTDEL.getStatus());
+        criteria.andIn("chargingPlieGuid",chargingPlieGuids);
+        List<Device> devices = deviceMapper.selectByCondition(condition);
+        return devices;
+    }
+}

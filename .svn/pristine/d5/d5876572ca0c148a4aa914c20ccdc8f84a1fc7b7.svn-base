@@ -1,0 +1,26 @@
+package cn.com.cdboost.charge.merchant.dubbo;
+
+import cn.com.cdboost.charge.merchant.vo.info.PaySchemeVo;
+
+import java.util.List;
+
+/**
+ * 充电方案接口
+ */
+public interface PaySchemeService {
+    /**
+     * 根据schemeGuid查询方案
+     * @param schemeGuid
+     * @return
+     */
+    PaySchemeVo queryPaySchemeBySchemeGuid(String schemeGuid);
+
+    // 充电页面，查询价格方案
+    List<PaySchemeVo> querySchemeList4ChargePage(String projectGuid);
+
+    // 查询方案二列表
+    List<PaySchemeVo> querySchemeTwoList(String projectGuid);
+
+    // 查询方案4列表
+    List<PaySchemeVo> querySchemeList4ActivityPage();
+}

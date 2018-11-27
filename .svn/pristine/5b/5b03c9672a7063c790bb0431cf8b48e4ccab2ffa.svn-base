@@ -1,0 +1,43 @@
+package cn.com.cdboost.charge.merchant.dubbo;
+
+/**
+ * @author wt
+ * @desc
+ * @create in  2018/10/10
+ **/
+
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.merchant.vo.info.ChargingDeviceVo;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceVo;
+import cn.com.cdboost.charge.merchant.vo.param.ChargerDeviceQueryParam;
+import cn.com.cdboost.charge.merchant.vo.param.DeviceParam;
+import cn.com.cdboost.charge.merchant.vo.param.WithdrawCashListParam;
+
+import java.util.List;
+
+/**
+ * web端充电设备管理接口
+ */
+public interface WebChargingDeviceService {
+
+    List<ChargingDeviceVo> deviceList(ChargerDeviceQueryParam queryParam, Integer userId);
+
+    void addDevice(DeviceParam chargingDevice, Integer userId);
+    //添加ic卡下发表
+    void addCardList(DeviceParam chargingDevice);
+
+    boolean deleteDevice(List<String> chargingPlieGuids, Integer userId);
+    //删除ic卡下发表
+    void deleteCardList(List<String> deviceNos);
+
+    ChargingDeviceVo queryDeviceDetial(String chargingPlieGuid);
+
+    ChargingDeviceVo queryByChargingPlieGuid(String chargingPlieGuid);
+
+
+    public PageData withdrawCashList(WithdrawCashListParam withdrawCashListDto);
+
+    public boolean editDevice(DeviceVo chargingDevice, Integer userId) ;
+
+    public void editCardList(DeviceVo chargingDevice, String oldProjectGuid) ;
+}

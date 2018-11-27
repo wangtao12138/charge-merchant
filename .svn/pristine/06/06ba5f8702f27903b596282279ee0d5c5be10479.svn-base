@@ -1,0 +1,314 @@
+package cn.com.cdboost.charge.merchant.dubbo.impl;
+
+
+import cn.com.cdboost.charge.base.exception.BusinessException;
+import cn.com.cdboost.charge.base.util.DateUtil;
+import cn.com.cdboost.charge.base.util.UuidUtil;
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.customer.dubbo.CustomerToMerchantService;
+import cn.com.cdboost.charge.customer.vo.info.*;
+import cn.com.cdboost.charge.merchant.common.BaseServiceImpl;
+import cn.com.cdboost.charge.merchant.constant.DeviceConstant;
+import cn.com.cdboost.charge.merchant.dao.DeviceMapper;
+import cn.com.cdboost.charge.merchant.dao.ProjectMapper;
+import cn.com.cdboost.charge.merchant.dubbo.DeviceService;
+import cn.com.cdboost.charge.merchant.model.Device;
+import cn.com.cdboost.charge.merchant.model.DeviceEvent;
+import cn.com.cdboost.charge.merchant.model.Project;
+import cn.com.cdboost.charge.merchant.service.IDeviceEventService;
+import cn.com.cdboost.charge.merchant.service.IDeviceService;
+import cn.com.cdboost.charge.merchant.vo.dto.*;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceCountByRunStateVo;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceDetailVo;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceEventVo;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceVo;
+import cn.com.cdboost.charge.merchant.vo.param.DevicePageQueryParam;
+import cn.com.cdboost.charge.user.dubbo.OrgService;
+import com.alibaba.dubbo.config.annotation.Reference;
+import com.alibaba.dubbo.config.annotation.Service;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
+import com.google.common.collect.Lists;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
+import tk.mybatis.mapper.entity.Condition;
+import tk.mybatis.mapper.entity.Example;
+
+import java.util.List;
+
+@Slf4j
+@Service(version = "1.0",retries = -1)
+public class DeviceServiceImpl extends BaseServiceImpl<Device> implements DeviceService {
+    @Autowired
+    private DeviceMapper deviceMapper;
+    @Autowired
+    private IDeviceService iDeviceService;
+    @Autowired
+    private IDeviceEventService iDeviceEventService;
+    @Reference(version = "1.0")
+    private OrgService orgService;
+    @Autowired
+    private ProjectMapper projectMapper;
+
+    @Reference(version = "1.0")
+    private CustomerToMerchantService customerToMerchantService;
+
+
+    @Override
+    public DeviceDetailVo queryDeviceDetail(String chargingPlieGuid) {
+        DeviceDetailVo deviceVo = new DeviceDetailVo();
+        Device param = new Device();
+        param.setChargingPlieGuid(chargingPlieGuid);
+        Device device = iDeviceService.selectOne(param);
+        BeanUtils.copyProperties(device,deviceVo);
+        if (device.getRunState() != DeviceConstant.DeviceRunState.CHARGING.getState()){
+            return deviceVo;
+        }
+        //TODO 充电中设备查询使用记录
+        return deviceVo;
+    }
+
+    @Override
+    public PageData queryDeviceByProjectGuid(DevicePageQueryParam queryVo) {
+        List<Device> devices = iDeviceService.queryDevicesByCondition(queryVo);
+        PageInfo pageInfo = new PageInfo(devices);
+        List<DeviceVo> projectVos = Lists.newArrayList();
+        for (Device device : devices) {
+            DeviceVo vo = new DeviceVo();
+            BeanUtils.copyProperties(device,vo);
+            projectVos.add(vo);
+        }
+        //封装返回对象
+        PageData pageData = new PageData();
+        pageData.setList(projectVos);
+        pageData.setTotal(pageInfo.getTotal());
+        return pageData;
+    }
+
+    @Override
+    @Transactional
+    public void addDevice(DeviceVo vo) throws BusinessException {
+        Device device = new Device();
+        device.setDeviceNo(vo.getDeviceNo());
+        List<Device> select = iDeviceService.select(device);
+        if (CollectionUtils.isEmpty(select)){
+            throw new BusinessException("平台暂无该设备！");
+        }
+        for (Device device1 : select) {
+            if (!StringUtils.isEmpty(device1.getMerchantGuid())){
+                throw new BusinessException("该设备已绑定商户！");
+            }
+        }
+        BeanUtils.copyProperties(vo,device);
+        device.setChargingPlieGuid(UuidUtil.getUuid());
+        iDeviceService.insertSelective(device);
+    }
+
+    @Override
+    @Transactional
+    public void updateDevice(DeviceVo vo) throws BusinessException {
+        Device device = new Device();
+        //根据deviceNo查询数据库
+        Device queryVo = new Device();
+        queryVo.setDeviceNo(device.getDeviceNo());
+        queryVo.setCommNo(device.getCommNo());
+        List<Device> list = iDeviceService.select(queryVo);
+        //判断是否已存在此deviceNo
+        if (list.size() > 0){
+            for (Device device1 : list) {
+                if(device1.getIsDel() == 0){
+                    throw new BusinessException("设备编号或通信编号不能重复");
+                }
+            }
+        }
+        BeanUtils.copyProperties(vo,device);
+        iDeviceService.updateByChargingPlieGuid(vo);
+    }
+
+    @Override
+    @Transactional
+    public void deleteDeviceByDeviceNos(List<String> deviceNos) {
+        iDeviceService.batchDelete(deviceNos);
+    }
+
+    @Override
+    public void bindingProject(DeviceVo vo) {
+        iDeviceService.updateByDeviceNo(vo);
+    }
+
+    @Override
+    public DeviceCountByRunStateVo queryDeviceCount(String merchantGuid) {
+        DeviceCountByRunStateVo deviceCountByRunStateVo = new DeviceCountByRunStateVo();
+        DevicePageQueryParam queryParam = new DevicePageQueryParam();
+        queryParam.setMerchantGuid(merchantGuid);
+        List<Device> devices = iDeviceService.queryDevicesByCondition(queryParam);
+        //总数
+        Integer total = devices.size()/2;
+        //充电中数量
+        Integer onTotal = 0;
+        //在线数量
+        Integer onlineTotal = 0;
+        //离线数量
+        Integer offlineTotal = 0;
+        for (Device device : devices) {
+            if (device.getOnline() == DeviceConstant.DeviceOnlineStatus.OFFLINE.getStatus()){
+                offlineTotal += 1;
+            }else {
+                onlineTotal += 1;
+                if (device.getRunState() == DeviceConstant.DeviceRunState.CHARGING.getState()){
+                    onTotal += 1;
+                }
+            }
+        }
+        deviceCountByRunStateVo.setTotal(total);
+        deviceCountByRunStateVo.setOnTotal(onTotal);
+        deviceCountByRunStateVo.setOfflineTotal(offlineTotal);
+        deviceCountByRunStateVo.setOnlineTotal(onlineTotal);
+        return deviceCountByRunStateVo;
+    }
+
+    @Override
+    public DeviceVo queryDevice(String deviceNo, String port) {
+        DeviceVo deviceVo = new DeviceVo();
+        Device param = new Device();
+        param.setDeviceNo(deviceNo);
+        param.setPort(port);
+        Device device = iDeviceService.selectOne(param);
+        BeanUtils.copyProperties(device,deviceVo);
+        return deviceVo;
+    }
+
+    @Override
+    public List<DeviceVo> queryDevices(List<String> chargingPlieGuids) {
+        List<Device> devices = iDeviceService.queryDevices(chargingPlieGuids);
+        List<DeviceVo> deviceVos = Lists.newArrayList();
+        for (Device device : devices) {
+            DeviceVo deviceVo = new DeviceVo();
+            BeanUtils.copyProperties(device,deviceVo);
+            deviceVos.add(deviceVo);
+        }
+        return deviceVos;
+    }
+
+    @Override
+    public PageData<DeviceEventVo> queryDeviceEvents(String merchantGuid, Integer eventCode,Integer pageNumber, Integer pageSize) {
+        PageData<DeviceEvent> pageData = iDeviceEventService.queryEventPage(merchantGuid,eventCode,pageNumber,pageSize);
+        List<DeviceEventVo> vos = Lists.newArrayList();
+        PageData<DeviceEventVo> pageDataResp = new PageData<>();
+        if (!CollectionUtils.isEmpty(pageData.getList())){
+            for (DeviceEvent deviceEvent : pageData.getList()) {
+                DeviceEventVo vo = new DeviceEventVo();
+                BeanUtils.copyProperties(deviceEvent,vo);
+                vo.setEventTime(DateUtil.formatDate(deviceEvent.getEventTime()));
+                vos.add(vo);
+            }
+            pageDataResp.setTotal(pageData.getTotal());
+            pageDataResp.setList(vos);
+        }
+        return pageDataResp;
+    }
+
+    @Override
+    public DeviceVo queryByChargingPlieGuid(String chargingPlieGuid) {
+        Device param = new Device();
+        param.setChargingPlieGuid(chargingPlieGuid);
+        param = deviceMapper.selectOne(param);
+        DeviceVo deviceVo=new DeviceVo();
+        BeanUtils.copyProperties(param,deviceVo);
+        return deviceVo;
+    }
+
+    @Override
+    public PageData customerInfoList(CustomerInfoListMerchantDto customerInfoListDto, Integer userId) {
+        List<Long> orgNoList = Lists.newArrayList();
+        List<String> proGuids = Lists.newArrayList();
+        if (customerInfoListDto.getNodeType() != null){//判断是否选择点击树
+            if (customerInfoListDto.getNodeType() ==1){//判断点击的树是组织还是项目：1-组织，2-项目
+                orgNoList.add(Long.parseLong(customerInfoListDto.getNodeId()));
+                List<Long> orgCacheVos = orgService.queryChildren(Long.parseLong(customerInfoListDto.getNodeId()));
+                orgNoList.addAll(orgCacheVos);
+                Condition condition = new Condition(Project.class);
+                Example.Criteria criteria = condition.createCriteria();
+                criteria.andIn("orgNo",orgNoList);
+                criteria.andEqualTo("isDel",0);
+                List<Project> chargingProjects = projectMapper.selectByCondition(condition);
+                for (Project chargingProject : chargingProjects) {
+                    proGuids.add(chargingProject.getProjectGuid());
+                }
+            }else if (customerInfoListDto.getNodeType() == 2){
+                proGuids.add(customerInfoListDto.getNodeId());
+            }
+        }else {
+            //查询用户拥有的组织数据权限
+            List<Long> dataOrgNos = orgService.queryDataOrgList(userId);
+            Condition condition = new Condition(Project.class);
+            Example.Criteria criteria = condition.createCriteria();
+            criteria.andIn("orgNo",dataOrgNos);
+            criteria.andEqualTo("isDel", 0);
+            List<Project> chargingProjects = projectMapper.selectByCondition(condition);
+            for (Project chargingProject : chargingProjects) {
+                proGuids.add(chargingProject.getProjectGuid());
+            }
+        }
+
+        customerInfoListDto.setProGuids(proGuids);
+        CustomerInfoListDto customerInfoListDto1=new CustomerInfoListDto();
+        BeanUtils.copyProperties(customerInfoListDto,customerInfoListDto1);
+        List<CustomerInfoListInfo> customerInfoListInfos = customerToMerchantService.customerInfoList(customerInfoListDto1);
+        List<CustomerInfoListMerchantInfo> customerInfoListInfo=Lists.newArrayList();
+        for (CustomerInfoListInfo customerInfoListInfo1 : customerInfoListInfos) {
+            CustomerInfoListMerchantInfo customerInfoListMerchantInfo=new CustomerInfoListMerchantInfo();
+            BeanUtils.copyProperties(customerInfoListInfo1,customerInfoListMerchantInfo);
+            customerInfoListInfo.add(customerInfoListMerchantInfo);
+        }
+
+        PageData pageData=new PageData();
+        pageData.setList(customerInfoListInfo);
+        pageData.setTotal(Long.valueOf(customerInfoListInfo.size()));
+        return pageData;
+    }
+
+    @Override
+    public ChargeCustomerInfoDetailMerchantInfo customerInfoDetail(String customerGuid) {
+        ChargeCustomerInfoDetailInfo chargeCustomerInfoDetailInfo = customerToMerchantService.customerInfoDetail(customerGuid);
+        ChargeCustomerInfoDetailMerchantInfo chargeCustomerInfoDetailMerchantInfo=new
+                ChargeCustomerInfoDetailMerchantInfo();
+        BeanUtils.copyProperties(chargeCustomerInfoDetailInfo,chargeCustomerInfoDetailMerchantInfo);
+        return chargeCustomerInfoDetailMerchantInfo;
+    }
+
+    @Override
+    public PageData useRecordList(UseRecordListMerchantDto useRecordListDto) {
+        PageHelper.startPage(useRecordListDto.getPageNumber(),useRecordListDto.getPageSize());
+        UseRecordListDto useRecordListDto1=new UseRecordListDto();
+        BeanUtils.copyProperties(useRecordListDto,useRecordListDto1);
+        PageData pageData = customerToMerchantService.useRecordList(useRecordListDto1);
+        return pageData;
+    }
+
+    @Override
+    public PageData chargeRecordList(ChargeRecordListMerchantDto chargeRecordListDto) {
+
+        PageHelper.startPage(chargeRecordListDto.getPageNumber(),chargeRecordListDto.getPageSize());
+
+        ChargeRecordListDto chargeRecordListDto1=new ChargeRecordListDto();
+        BeanUtils.copyProperties(chargeRecordListDto,chargeRecordListDto1);
+
+        PageData pageData = customerToMerchantService.chargeRecordList(chargeRecordListDto1);
+        return pageData;
+    }
+
+    @Override
+    public PageData withdrawCashList(WithdrawCashListDto withdrawCashListDto) {
+      /*  PageHelper.startPage(withdrawCashListDto.getPageNumber(),withdrawCashListDto.getPageSize());
+        List<WithdrawCashListInfo> withdrawCashListInfo = chargingWithdrawCashMapper.withdrawCashList(withdrawCashListDto);
+        PageInfo pageInfo =new PageInfo(withdrawCashListInfo);*/
+     return null;
+    }
+
+
+}

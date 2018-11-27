@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.cdboost.charge.merchant.dao.MerchantDaystaMapper">
+  <resultMap id="BaseResultMap" type="cn.com.cdboost.charge.merchant.model.MerchantDaysta">
+    <!--
+      WARNING - @mbg.generated
+    -->
+    <result column="id" jdbcType="INTEGER" property="id" />
+    <result column="merchant_guid" jdbcType="CHAR" property="merchantGuid" />
+    <result column="project_guid" jdbcType="CHAR" property="projectGuid" />
+    <result column="sta_date" jdbcType="DATE" property="staDate" />
+    <result column="charging_cnt" jdbcType="INTEGER" property="chargingCnt" />
+    <result column="card_pay_money" jdbcType="DECIMAL" property="cardPayMoney" />
+    <result column="total_pay_money" jdbcType="DECIMAL" property="totalPayMoney" />
+    <result column="total_money" jdbcType="DECIMAL" property="totalMoney" />
+    <result column="total_profitable" jdbcType="DECIMAL" property="totalProfitable" />
+    <result column="total_power" jdbcType="DECIMAL" property="totalPower" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+  </resultMap>
+</mapper>

@@ -1,0 +1,97 @@
+package cn.com.cdboost.charge.merchant.service;
+
+import cn.com.cdboost.charge.base.util.UuidUtil;
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.merchant.common.BaseServiceImpl;
+import cn.com.cdboost.charge.merchant.constant.ChargeConstant;
+import cn.com.cdboost.charge.merchant.dao.ProjectMapper;
+import cn.com.cdboost.charge.merchant.dto.ProjectListDto;
+import cn.com.cdboost.charge.merchant.dto.param.ProjectQueryParamDao;
+import cn.com.cdboost.charge.merchant.model.MerchantProperty;
+import cn.com.cdboost.charge.merchant.model.Project;
+import cn.com.cdboost.charge.merchant.vo.info.ProjectVo;
+import cn.com.cdboost.charge.merchant.vo.param.ProjectQueryParam;
+import cn.com.cdboost.charge.user.exception.BusinessException;
+import com.alibaba.dubbo.config.annotation.Service;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import tk.mybatis.mapper.entity.Condition;
+import tk.mybatis.mapper.entity.Example;
+
+import java.util.Date;
+import java.util.List;
+
+@Slf4j
+@Service(version = "1.0",retries = -1)
+public class ProjectServiceImpl extends BaseServiceImpl<Project> implements ProjectServiceDubbo {
+    @Autowired
+    private ProjectMapper projectMapper;
+    @Override
+    public PageData queryProjectByPropertyGuid(ProjectQueryParam queryVo) {
+        PageData pageData = new PageData();
+        ProjectQueryParamDao projectQueryParamDao = new ProjectQueryParamDao();
+        List<ProjectListDto> projectListDtos = projectMapper.queryProjectDeviceCount(projectQueryParamDao);
+        pageData.setList(projectListDtos);
+        return pageData;
+    }
+
+    @Override
+    @Transactional
+    public void addProject(ProjectVo queryVo) {
+        Project project = new Project();
+        project.setProjectName(queryVo.getProjectName());
+        List<Project> select = projectMapper.select(project);
+        if (select.size() > 0){
+            throw new BusinessException("站点名称不能重复！");
+        }
+        BeanUtils.copyProperties(queryVo,project);
+        project.setProjectGuid(UuidUtil.getUuid());
+        project.setPrice(queryVo.getBasePrice().add(queryVo.getUpPrice()));
+        projectMapper.insertSelective(project);
+    }
+
+    @Override
+    @Transactional
+    public void updateProject(ProjectVo queryVo) {
+        //判断修改站点名称是否重复
+        Condition condition1 = new Condition(Project.class);
+        Example.Criteria criteria1 = condition1.createCriteria();
+        criteria1.andNotEqualTo("projectGuid",queryVo.getProjectGuid());
+        criteria1.andEqualTo("projectName",queryVo.getProjectName());
+        List<Project> projects = projectMapper.selectByCondition(condition1);
+        if (projects.size() > 0){
+            throw new BusinessException("站点名称不能重复！");
+        }
+        Project project = new Project();
+        BeanUtils.copyProperties(queryVo,project);
+        project.setUpdateTime(new Date());
+        Condition condition = new Condition(Project.class);
+        Example.Criteria criteria = condition.createCriteria();
+        criteria.andEqualTo("propertyGuid",queryVo.getPropertyGuid());
+        projectMapper.updateByConditionSelective(project,condition);
+    }
+
+    @Override
+    @Transactional
+    public void deleteProjectByProjectGuids(List<String> projectGuids) {
+        Condition condition = new Condition(Project.class);
+        Example.Criteria criteria = condition.createCriteria();
+        criteria.andIn("projectGuid",projectGuids);
+        Project project = new Project();
+        project.setIsDel(ChargeConstant.IsDel.DEL.getStatus());
+        projectMapper.updateByConditionSelective(project,condition);
+    }
+
+    @Override
+    public ProjectVo queryProjectDetail(String projectGuid) {
+        Project param = new Project();
+        param.setProjectGuid(projectGuid);
+        Project project = projectMapper.selectOne(param);
+        ProjectVo projectVo = new ProjectVo();
+        BeanUtils.copyProperties(project,projectVo);
+        return projectVo;
+    }
+}

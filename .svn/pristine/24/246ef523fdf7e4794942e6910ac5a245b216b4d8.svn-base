@@ -1,0 +1,610 @@
+package cn.com.cdboost.charge.merchant.dubbo.impl;
+
+
+import cn.com.cdboost.charge.base.exception.BusinessException;
+import cn.com.cdboost.charge.base.util.CNoUtil;
+import cn.com.cdboost.charge.base.util.DateUtil;
+import cn.com.cdboost.charge.base.util.MathUtil;
+import cn.com.cdboost.charge.base.util.UuidUtil;
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.customer.dubbo.CustomerToMerchantService;
+import cn.com.cdboost.charge.customer.vo.info.*;
+import cn.com.cdboost.charge.merchant.common.BaseServiceImpl;
+import cn.com.cdboost.charge.merchant.constant.DeviceConstant;
+import cn.com.cdboost.charge.merchant.dao.DeviceMapper;
+import cn.com.cdboost.charge.merchant.dao.ProjectMapper;
+import cn.com.cdboost.charge.merchant.dubbo.DeviceService;
+import cn.com.cdboost.charge.merchant.model.Device;
+import cn.com.cdboost.charge.merchant.model.DeviceEvent;
+import cn.com.cdboost.charge.merchant.model.Project;
+import cn.com.cdboost.charge.merchant.service.IDeviceEventService;
+import cn.com.cdboost.charge.merchant.service.IDeviceService;
+import cn.com.cdboost.charge.merchant.vo.dto.*;
+import cn.com.cdboost.charge.merchant.vo.info.*;
+import cn.com.cdboost.charge.merchant.vo.param.DevicePageQueryParam;
+import cn.com.cdboost.charge.statistic.dubbo.StatisticService;
+import cn.com.cdboost.charge.statistic.vo.dto.*;
+import cn.com.cdboost.charge.statistic.vo.info.MeterSummaryVo;
+import cn.com.cdboost.charge.user.dubbo.CustomerDevMapService;
+import cn.com.cdboost.charge.user.dubbo.OrgService;
+import cn.com.cdboost.charge.user.vo.CustomerDevMapWeb;
+import cn.com.cdboost.charge.user.vo.ImportantCurveDerailDTO;
+import cn.com.cdboost.charge.user.vo.ImportantCurveVo;
+import com.alibaba.dubbo.config.annotation.Reference;
+import com.alibaba.dubbo.config.annotation.Service;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
+import com.google.common.base.Function;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
+import tk.mybatis.mapper.entity.Condition;
+import tk.mybatis.mapper.entity.Example;
+
+import javax.annotation.Nullable;
+import java.math.BigDecimal;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+@Slf4j
+@Service(version = "1.0",retries = -1,timeout = 5000)
+public class DeviceServiceImpl extends BaseServiceImpl<Device> implements DeviceService {
+    @Autowired
+    private DeviceMapper deviceMapper;
+    @Autowired
+    private IDeviceService iDeviceService;
+    @Autowired
+    private IDeviceEventService iDeviceEventService;
+    @Reference(version = "1.0")
+    private OrgService orgService;
+    @Autowired
+    private ProjectMapper projectMapper;
+    @Reference(version = "1.0")
+    private StatisticService statisticService;
+
+
+    @Reference(version = "1.0")
+    private CustomerToMerchantService customerToMerchantService;
+
+    @Reference(version = "1.0")
+    CustomerDevMapService customerDevMapService;
+    @Override
+    public DeviceDetailVo queryDeviceDetail(String chargingPlieGuid) {
+        DeviceDetailVo deviceVo = new DeviceDetailVo();
+        Device param = new Device();
+        param.setChargingPlieGuid(chargingPlieGuid);
+        Device device = iDeviceService.selectOne(param);
+        BeanUtils.copyProperties(device,deviceVo);
+        if (device.getRunState() != DeviceConstant.DeviceRunState.CHARGING.getState()){
+            return deviceVo;
+        }
+        //查询充电中设备查询使用记录
+        DeviceUseDetailedVo deviceUseDetailed = new DeviceUseDetailedVo();
+        deviceUseDetailed.setChargingPlieGuid(chargingPlieGuid);
+        DeviceUseDetailedVo deviceUseDetailedVo = customerToMerchantService.queryDeviceUseDetailed(deviceUseDetailed);
+        BeanUtils.copyProperties(deviceUseDetailedVo,deviceVo);
+        return deviceVo;
+    }
+
+    @Override
+    public PageData queryDeviceByProjectGuid(DevicePageQueryParam queryVo) {
+        List<Device> devices = iDeviceService.queryDevicesByCondition(queryVo);
+        PageInfo pageInfo = new PageInfo(devices);
+        List<DeviceVo> projectVos = Lists.newArrayList();
+        for (Device device : devices) {
+            DeviceVo vo = new DeviceVo();
+            BeanUtils.copyProperties(device,vo);
+            projectVos.add(vo);
+        }
+        //封装返回对象
+        PageData pageData = new PageData();
+        pageData.setList(projectVos);
+        pageData.setTotal(pageInfo.getTotal());
+        return pageData;
+    }
+
+    @Override
+    @Transactional
+    public void addDevice(DeviceVo vo) throws BusinessException {
+        Device device = new Device();
+        device.setDeviceNo(vo.getDeviceNo());
+        device.setIsDel(DeviceConstant.IsDel.NOTDEL.getStatus());
+        List<Device> select = iDeviceService.select(device);
+        if (CollectionUtils.isEmpty(select)){
+            throw new BusinessException("平台暂无该设备！");
+        }
+        for (Device device1 : select) {
+            if (!StringUtils.isEmpty(device1.getMerchantGuid())){
+                throw new BusinessException("该设备已绑定商户！");
+            }
+        }
+        BeanUtils.copyProperties(vo,device);
+        device.setChargingPlieGuid(UuidUtil.getUuid());
+        iDeviceService.insertSelective(device);
+    }
+
+    @Override
+    @Transactional
+    public void updateDevice(DeviceVo vo) throws BusinessException {
+        Device device = new Device();
+        //根据deviceNo查询数据库
+        Device queryVo = new Device();
+        queryVo.setDeviceNo(device.getDeviceNo());
+        queryVo.setCommNo(device.getCommNo());
+        queryVo.setIsDel(DeviceConstant.IsDel.NOTDEL.getStatus());
+        List<Device> list = iDeviceService.select(queryVo);
+        //判断是否已存在此deviceNo
+        if (list.size() > 0){
+            for (Device device1 : list) {
+                if(device1.getIsDel() == 0){
+                    throw new BusinessException("设备编号或通信编号不能重复");
+                }
+            }
+        }
+        BeanUtils.copyProperties(vo,device);
+        iDeviceService.updateByChargingPlieGuid(vo);
+    }
+
+    @Override
+    @Transactional
+    public void deleteDeviceByDeviceNos(List<String> deviceNos) {
+        iDeviceService.batchDelete(deviceNos);
+    }
+
+    @Override
+    public void bindingProject(DeviceVo vo) throws BusinessException{
+        Device device = new Device();
+        device.setDeviceNo(vo.getDeviceNo());
+        device.setIsDel(DeviceConstant.IsDel.NOTDEL.getStatus());
+        List<Device> select = iDeviceService.select(device);
+        if (CollectionUtils.isEmpty(select)){
+            throw new BusinessException("平台暂无该设备！");
+        }
+        for (Device device1 : select) {
+            if (!StringUtils.isEmpty(device1.getMerchantGuid())){
+                throw new BusinessException("该设备已绑定商户！");
+            }
+        }
+        iDeviceService.updateByDeviceNo(vo);
+    }
+
+    @Override
+    public DeviceCountByRunStateVo queryDeviceCount(String merchantGuid) {
+        DeviceCountByRunStateVo deviceCountByRunStateVo = new DeviceCountByRunStateVo();
+        DevicePageQueryParam queryParam = new DevicePageQueryParam();
+        queryParam.setMerchantGuid(merchantGuid);
+        List<Device> devices = iDeviceService.queryDevicesByCondition(queryParam);
+        //总数
+        Integer total = devices.size()/2;
+        //充电中数量
+        Integer onTotal = 0;
+        //在线数量
+        Integer onlineTotal = 0;
+        //离线数量
+        Integer offlineTotal = 0;
+        for (Device device : devices) {
+            if (device.getOnline() == DeviceConstant.DeviceOnlineStatus.OFFLINE.getStatus()){
+                offlineTotal += 1;
+            }else {
+                onlineTotal += 1;
+                if (device.getRunState() == DeviceConstant.DeviceRunState.CHARGING.getState()){
+                    onTotal += 1;
+                }
+            }
+        }
+        deviceCountByRunStateVo.setTotal(total);
+        deviceCountByRunStateVo.setOnTotal(onTotal);
+        deviceCountByRunStateVo.setOfflineTotal(offlineTotal);
+        deviceCountByRunStateVo.setOnlineTotal(onlineTotal);
+        return deviceCountByRunStateVo;
+    }
+
+    @Override
+    public DeviceVo queryDevice(String deviceNo, String port) {
+        DeviceVo deviceVo = new DeviceVo();
+        Device param = new Device();
+        param.setDeviceNo(deviceNo);
+        param.setPort(port);
+        param.setIsDel(DeviceConstant.IsDel.NOTDEL.getStatus());
+        Device device = iDeviceService.selectOne(param);
+        BeanUtils.copyProperties(device,deviceVo);
+        return deviceVo;
+    }
+
+    @Override
+    public List<DeviceVo> queryDevices(List<String> chargingPlieGuids) {
+        List<Device> devices = iDeviceService.queryDevices(chargingPlieGuids);
+        List<DeviceVo> deviceVos = Lists.newArrayList();
+        for (Device device : devices) {
+            DeviceVo deviceVo = new DeviceVo();
+            BeanUtils.copyProperties(device,deviceVo);
+            deviceVos.add(deviceVo);
+        }
+        return deviceVos;
+    }
+
+    @Override
+    public PageData<DeviceEventVo> queryDeviceEvents(String merchantGuid, Integer eventCode,Integer pageNumber, Integer pageSize) {
+        PageData<DeviceEvent> pageData = iDeviceEventService.queryEventPage(merchantGuid,eventCode,pageNumber,pageSize);
+        List<DeviceEventVo> vos = Lists.newArrayList();
+        PageData<DeviceEventVo> pageDataResp = new PageData<>();
+        if (!CollectionUtils.isEmpty(pageData.getList())){
+            for (DeviceEvent deviceEvent : pageData.getList()) {
+                DeviceEventVo vo = new DeviceEventVo();
+                BeanUtils.copyProperties(deviceEvent,vo);
+                vo.setEventTime(DateUtil.formatDate(deviceEvent.getEventTime()));
+                vos.add(vo);
+            }
+            pageDataResp.setTotal(pageData.getTotal());
+            pageDataResp.setList(vos);
+        }
+        return pageDataResp;
+    }
+
+    @Override
+    public DeviceVo queryByChargingPlieGuid(String chargingPlieGuid) {
+        Device param = new Device();
+        param.setChargingPlieGuid(chargingPlieGuid);
+        param = deviceMapper.selectOne(param);
+        DeviceVo deviceVo=new DeviceVo();
+        BeanUtils.copyProperties(param,deviceVo);
+        return deviceVo;
+    }
+
+    @Override
+    public PageData customerInfoList(CustomerInfoListMerchantDto customerInfoListDto, Integer userId) {
+        List<Long> orgNoList = Lists.newArrayList();
+        List<String> proGuids = Lists.newArrayList();
+        if (customerInfoListDto.getNodeType() != null){//判断是否选择点击树
+            if (customerInfoListDto.getNodeType() ==1){//判断点击的树是组织还是项目：1-组织，2-项目
+                orgNoList.add(Long.parseLong(customerInfoListDto.getNodeId()));
+                List<Long> orgCacheVos = orgService.queryChildren(Long.parseLong(customerInfoListDto.getNodeId()));
+                orgNoList.addAll(orgCacheVos);
+                Condition condition = new Condition(Project.class);
+                Example.Criteria criteria = condition.createCriteria();
+                criteria.andIn("orgNo",orgNoList);
+                criteria.andEqualTo("isDel",1);
+                List<Project> chargingProjects = projectMapper.selectByCondition(condition);
+                for (Project chargingProject : chargingProjects) {
+                    proGuids.add(chargingProject.getProjectGuid());
+                }
+            }else if (customerInfoListDto.getNodeType() == 2){
+                proGuids.add(customerInfoListDto.getNodeId());
+            }
+        }else {
+            //查询用户拥有的组织数据权限
+            List<Long> dataOrgNos = orgService.queryDataOrgList(userId);
+            Condition condition = new Condition(Project.class);
+            Example.Criteria criteria = condition.createCriteria();
+            criteria.andIn("orgNo",dataOrgNos);
+            criteria.andEqualTo("isDel", 1);
+            List<Project> chargingProjects = projectMapper.selectByCondition(condition);
+            for (Project chargingProject : chargingProjects) {
+                proGuids.add(chargingProject.getProjectGuid());
+            }
+        }
+
+        customerInfoListDto.setProGuids(proGuids);
+        CustomerInfoListDto customerInfoListDto1=new CustomerInfoListDto();
+        BeanUtils.copyProperties(customerInfoListDto,customerInfoListDto1);
+        PageData pageData1 = customerToMerchantService.customerInfoList(customerInfoListDto1);
+        List<CustomerInfoListMerchantInfo> customerInfoListInfo=Lists.newArrayList();
+        List<CustomerInfoListInfo> list = pageData1.getList();
+        for (CustomerInfoListInfo customerInfoListInfo1 : list) {
+            CustomerInfoListMerchantInfo customerInfoListMerchantInfo=new CustomerInfoListMerchantInfo();
+            BeanUtils.copyProperties(customerInfoListInfo1,customerInfoListMerchantInfo);
+            customerInfoListInfo.add(customerInfoListMerchantInfo);
+        }
+
+        PageData pageData=new PageData();
+        pageData.setList(customerInfoListInfo);
+        pageData.setTotal(pageData1.getTotal());
+        return pageData;
+    }
+
+    @Override
+    public ChargeCustomerInfoDetailMerchantInfo customerInfoDetail(String customerGuid) {
+        ChargeCustomerInfoDetailInfo chargeCustomerInfoDetailInfo = customerToMerchantService.customerInfoDetail(customerGuid);
+        ChargeCustomerInfoDetailMerchantInfo chargeCustomerInfoDetailMerchantInfo=new
+                ChargeCustomerInfoDetailMerchantInfo();
+        BeanUtils.copyProperties(chargeCustomerInfoDetailInfo,chargeCustomerInfoDetailMerchantInfo);
+        return chargeCustomerInfoDetailMerchantInfo;
+    }
+
+    @Override
+    public PageData useRecordList(UseRecordListMerchantDto useRecordListDto) {
+        PageHelper.startPage(useRecordListDto.getPageNumber(),useRecordListDto.getPageSize());
+        UseRecordListDto useRecordListDto1=new UseRecordListDto();
+        BeanUtils.copyProperties(useRecordListDto,useRecordListDto1);
+        PageData pageData = customerToMerchantService.useRecordList(useRecordListDto1);
+        return pageData;
+    }
+
+    @Override
+    public PageData chargeRecordList(ChargeRecordListMerchantDto chargeRecordListDto) {
+
+        PageHelper.startPage(chargeRecordListDto.getPageNumber(),chargeRecordListDto.getPageSize());
+
+        ChargeRecordListDto chargeRecordListDto1=new ChargeRecordListDto();
+        BeanUtils.copyProperties(chargeRecordListDto,chargeRecordListDto1);
+
+        PageData pageData = customerToMerchantService.chargeRecordList(chargeRecordListDto1);
+        return pageData;
+    }
+
+    @Override
+    public PageData withdrawCashList(WithdrawCashListDto withdrawCashListDto) {
+       /* PageHelper.startPage(withdrawCashListDto.getPageNumber(),withdrawCashListDto.getPageSize());
+        List<WithdrawCashListInfo> withdrawCashListInfo = chargingWithdrawCashMapper.withdrawCashList(withdrawCashListDto);
+        PageInfo pageInfo =new PageInfo(withdrawCashListInfo);*/
+        return null;
+    }
+    @Override
+    public TotalLineLossInfo totalLineLoss(TotalLineLossDto totalLineLossDto) {
+
+        Device chargingDevice=new Device();
+        chargingDevice.setIsDel(1);
+        List<Device> devices = deviceMapper.select(chargingDevice);
+        List<DeviceStatisticVo> deviceStatisticVos=Lists.newArrayList();
+        if(!CollectionUtils.isEmpty(devices)){
+            for (Device device : devices) {
+
+                DeviceStatisticVo deviceStatisticVo=new DeviceStatisticVo();
+                BeanUtils.copyProperties(device,deviceStatisticVo);
+                deviceStatisticVos.add(deviceStatisticVo);
+            }
+        }
+
+        TotalLineLossStatisticDto totalLineLossStatisticDto=new TotalLineLossStatisticDto();
+
+        BeanUtils.copyProperties(totalLineLossDto,totalLineLossStatisticDto);
+
+        PageData pageData = statisticService.selectChargingSummary(deviceStatisticVos,totalLineLossStatisticDto);
+        List<MeterSummaryVo> chargingSummaries = pageData.getList();
+
+        TotalLineLossInfo totalLineLossInfo=new TotalLineLossInfo();
+
+        List<LineLossCurve> lineLossCurves=Lists.newArrayList();
+        List<LineLossList> lineLossLists=Lists.newArrayList();
+        LineLossStatistics lineLossStatistics=new LineLossStatistics();
+        BigDecimal meterElect=BigDecimal.ZERO;
+        BigDecimal deviceElect=BigDecimal.ZERO;
+        BigDecimal lossElect=BigDecimal.ZERO;
+        BigDecimal lossRate;
+        for (MeterSummaryVo chargingSummary : chargingSummaries) {
+            LineLossCurve lineLossCurve=new LineLossCurve();
+            LineLossList lineLossList=new LineLossList();
+            lineLossList.setChargeTime(String.valueOf(chargingSummary.getChargingCount()));
+            lineLossList.setDate(DateUtil.formatDay(chargingSummary.getSumDate()));
+            lineLossList.setDeviceElect(String.valueOf(MathUtil.setPrecision(chargingSummary.getChargingPower())));
+            lineLossList.setDeviceNo(chargingSummary.getMeterNo());
+            lineLossList.setInstallAddr(chargingSummary.getInstallAddr());
+            lineLossList.setLastReadValue(String.valueOf(chargingSummary.getLastReadValue()==null?"":MathUtil.setPrecision(chargingSummary.getLastReadValue())));
+            lineLossList.setReadValue(String.valueOf(chargingSummary.getReadValue()==null?"": MathUtil.setPrecision(chargingSummary.getReadValue())
+            ));
+            lineLossList.setLossPower(String.valueOf(MathUtil.setPrecision(chargingSummary.getLossPower())));
+            BigDecimal lossRate1 = chargingSummary.getLossRate();
+            lossRate1 = lossRate1.multiply(BigDecimal.valueOf(100));
+            lineLossList.setLossRate(String.valueOf(MathUtil.setPrecision(lossRate1)));
+            lineLossList.setMeterElect(String.valueOf(MathUtil.setPrecision(chargingSummary.getMeterPower())));
+            lineLossCurve.setDate(DateUtil.formatDay(chargingSummary.getSumDate()));
+            lineLossCurve.setLossElect(String.valueOf(MathUtil.setPrecision(chargingSummary.getLossPower())));
+            lineLossCurves.add(lineLossCurve);
+            lineLossLists.add(lineLossList);
+            meterElect=meterElect.add(chargingSummary.getMeterPower());
+            deviceElect=deviceElect.add(chargingSummary.getChargingPower());
+            lossElect=lossElect.add(chargingSummary.getLossPower());
+        }
+        Collections.sort(lineLossCurves, (o1, o2) -> {
+            try {
+                return DateUtil.parseDate(o1.getDate()).compareTo(DateUtil.parseDate(o2.getDate()));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return 0;
+        });
+        totalLineLossInfo.setLoss(lineLossCurves);
+        totalLineLossInfo.setList(lineLossLists);
+        lineLossStatistics.setMeterElect(String.valueOf(MathUtil.setPrecision(meterElect)));
+        lineLossStatistics.setDeviceElect(String.valueOf(MathUtil.setPrecision(deviceElect)));
+        lineLossStatistics.setLossPower(String.valueOf(MathUtil.setPrecision(lossElect)));
+        if(meterElect.doubleValue()!=0){
+            lossRate=lossElect.divide(meterElect,4, BigDecimal.ROUND_HALF_UP);
+            lineLossStatistics.setLossRate(String.valueOf(lossRate.multiply(new BigDecimal(100)).setScale(2,BigDecimal.ROUND_HALF_UP)));
+        }
+        totalLineLossInfo.setStatistics(lineLossStatistics);
+        totalLineLossInfo.setTotal(pageData.getTotal());
+        return totalLineLossInfo;
+    }
+
+    @Override
+    public DeviceVo queryByCommon(String common, String port) {
+        Device param = new Device();
+        param.setCommNo(common);
+        param.setPort(port);
+        param.setIsDel(1);
+        Device device = deviceMapper.selectOne(param);
+        DeviceVo deviceVo=new DeviceVo();
+        BeanUtils.copyProperties(device,deviceVo);
+        return deviceVo;
+    }
+
+    @Override
+    public DayLineLossMerchantInfo dayLineLoss(DayLineLossMerchantDto dayLineLossDto) throws ParseException {
+        DayLineLossMerchantInfo dayLineLossInfo=new DayLineLossMerchantInfo();
+        String cNo = CNoUtil.CreateCNo(dayLineLossDto.getDeviceType(), dayLineLossDto.getDeviceNo());
+        dayLineLossDto.setDeviceCno(cNo);
+        CustomerDevMapWeb customerDevMap = customerDevMapService.queryByCno(cNo);
+        if(customerDevMap==null){
+            return null;
+        }
+        ImportantCurveVo ImportantCurveVo=new ImportantCurveVo();
+        ImportantCurveVo.setCustomerNo(customerDevMap.getCustomerNo());
+        ImportantCurveVo.setMeterUserNo(customerDevMap.getMeterUserNo());
+        ImportantCurveVo.setDeviceType(customerDevMap.getDeviceType());
+        ImportantCurveVo.setStartTime(dayLineLossDto.getDate()+" 00:00:00");
+        ImportantCurveVo.setEndTime(DateUtil.getEndTime(dayLineLossDto.getDate()));
+        ImportantCurveVo.setModel("3");
+        List<ImportantCurveDerailDTO> importantCurveDerailDTOS = customerDevMapService.queryImportCollection(ImportantCurveVo);
+        ArrayList importlist=Lists.newArrayList();
+        for (ImportantCurveDerailDTO importantCurveDerailDTO : importantCurveDerailDTOS) {
+            DayLineLossInfoimport dayLineLossInfoimport=new DayLineLossInfoimport();
+            dayLineLossInfoimport.setDate(importantCurveDerailDTO.getCollectDate());
+            dayLineLossInfoimport.setCurrentA(importantCurveDerailDTO.getCurrentA());
+            dayLineLossInfoimport.setVoltageA(importantCurveDerailDTO.getVoltageA());
+            importlist.add(dayLineLossInfoimport);
+        }
+        dayLineLossInfo.setImportlist(importlist);
+        DayLineLossDto dayLineLossDtoDao=new DayLineLossDto();
+        BeanUtils.copyProperties(dayLineLossDto,dayLineLossDtoDao);
+
+        List<DayLineLossInfo> dayLineLossInfos=customerToMerchantService.dayLineLoss(dayLineLossDtoDao);
+
+
+        ArrayList lineList=Lists.newArrayList();
+        for (DayLineLossInfo lineLossInfo : dayLineLossInfos) {
+            lineList.addAll(lineLossInfo.getList());
+        }
+        dayLineLossInfo.setList(lineList);
+
+        return dayLineLossInfo;
+    }
+
+    @Override
+    public List<DeviceVo> queryByMeterCno(String meterCno) {
+        Device param = new Device();
+        param.setMeterCno(meterCno);
+        param.setIsDel(1);
+        List<Device> device = iDeviceService.select(param);
+        List<DeviceVo> deviceVos=Lists.newArrayList();
+        for (Device device1 : device) {
+            DeviceVo deviceVo=new DeviceVo();
+            BeanUtils.copyProperties(device1,deviceVo);
+            deviceVos.add(deviceVo);
+        }
+        return deviceVos;
+
+    }
+
+    @Override
+    public PowerAndFeeCountInfo queryPowerAndFeeCount(ElectricCountQueryMerchantVo queryVo) {
+        PowerAndFeeCountInfo powerAndFeeCountInfo=new PowerAndFeeCountInfo();
+        if (queryVo.getNodeType() != null){//判断是否选择点击树
+            if(1==queryVo.getNodeType()){
+
+                List<Long> dataOrgNos = queryVo.getOrgNoList();
+                String orgNo = queryVo.getNodeId();
+                List<Long> childOrgNos = orgService.queryChildren(Long.valueOf(orgNo));
+                dataOrgNos.retainAll(childOrgNos);
+                queryVo.setOrgNoList(dataOrgNos);
+            }
+        }
+        Condition condition=new Condition(Project.class);
+        Example.Criteria criteria=condition.createCriteria();
+        criteria.andIn("orgNo",queryVo.getOrgNoList());
+        criteria.andEqualTo("isDel",1);
+        List<Project> projects = projectMapper.selectByCondition(condition);
+        List projectGuids=Lists.newArrayList();
+        for (Project project : projects) {
+            projectGuids.add(project.getProjectGuid());
+        }
+
+
+        if(queryVo.getMark() != null){
+            //设置年份
+            int year = Integer.parseInt(queryVo.getMark().substring(0,4));
+            //设置月份
+            int month = Integer.parseInt(queryVo.getMark().substring(5,7));
+            //List<ListElectricDto> dataList = Lists.newArrayList();
+            int monthMaxDay = DateUtil.getMonthMaxDay(year, month);
+
+
+            ElectricCountQueryVo electricCountQueryVo=new ElectricCountQueryVo();
+            BeanUtils.copyProperties(queryVo,electricCountQueryVo);
+            electricCountQueryVo.setYear(String.valueOf(year));
+            electricCountQueryVo.setMonth(String.valueOf(month));
+            electricCountQueryVo.setProjectGuids(projectGuids);
+            PowerAndFeeDto powerAndFeeDto = statisticService.queryMonthList(electricCountQueryVo);
+            if (powerAndFeeDto!=null){
+                BeanUtils.copyProperties(powerAndFeeDto,powerAndFeeCountInfo);
+            }
+
+            // 按月查询
+            String monthBeginTime = DateUtil.getMonthBeginTime(year, month);
+            String monthEndTime = DateUtil.getMonthEndTime(year, month);
+            electricCountQueryVo.setStartTime(monthBeginTime);
+            electricCountQueryVo.setEndTime(monthEndTime);
+            List<ListElectricDto> list = statisticService.queryDayList(electricCountQueryVo);
+
+            List<String> xData = Lists.newArrayList();
+            List<BigDecimal> yFeesData  = Lists.newArrayList();
+            List<BigDecimal> yQuantityData  = Lists.newArrayList();
+            if (CollectionUtils.isEmpty(list)) {
+                // 自己组装横坐标，纵坐标
+                BigDecimal totalFee = BigDecimal.ZERO;
+                BigDecimal totalquantity = BigDecimal.ZERO;
+                for (int i = 1; i <= monthMaxDay; i++) {
+                    String key = String.valueOf(i);
+                    if (i < 10) {
+                        key = "0" + i;
+                    }
+                    xData.add(key);
+                    //totalFee = MathUtil.setPrecision(totalquantity.multiply(new BigDecimal(0.82)));
+                    yFeesData.add(totalFee);
+                    yQuantityData.add(totalquantity);
+                }
+            } else {
+                // 按天分组
+                ImmutableMap<String, ListElectricDto> multimap = Maps.uniqueIndex(list, new Function<ListElectricDto, String>() {
+                    @Nullable
+                    @Override
+                    public String apply(@Nullable ListElectricDto listElectricDto) {
+                        return listElectricDto.getDayStr();
+                    }
+                });
+
+                // 按天统计电费，电量
+                for (int i = 1; i <= monthMaxDay; i++) {
+                    String key = String.valueOf(i);
+                    if (i < 10) {
+                        key = "0" + i;
+                    }
+                    ListElectricDto listElectricDto1 = multimap.get(key);
+                    BigDecimal totalFee = listElectricDto1.getYFeesData();
+                    BigDecimal totalquantity =listElectricDto1.getYQuantityData();
+                    xData.add(key);
+                    yFeesData.add(totalFee);
+                    yQuantityData.add(totalquantity);
+                }
+            }
+
+            powerAndFeeCountInfo.setxData(xData);
+            powerAndFeeCountInfo.setyFeesData(yFeesData);
+            powerAndFeeCountInfo.setyQuantityData(yQuantityData);
+            //powerAndFeeCountInfo.setListElectric(dataList);
+        }
+        return powerAndFeeCountInfo;
+    }
+
+    @Override
+    public void updateRunState(String commNo, Integer runState, String port) {
+        Condition condition = new Condition(Device.class);
+        Example.Criteria criteria = condition.createCriteria();
+        criteria.andEqualTo("commNo",commNo);
+        if (!StringUtils.isEmpty(port)){
+            criteria.andEqualTo("port",port);
+        }
+        Device chargingDevice = new Device();
+        chargingDevice.setRunState(runState);
+        deviceMapper.updateByConditionSelective(chargingDevice,condition);
+    }
+
+}

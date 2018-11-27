@@ -1,0 +1,11 @@
+package cn.com.cdboost.charge.merchant.service.impl;
+
+import cn.com.cdboost.charge.merchant.common.BaseServiceImpl;
+import cn.com.cdboost.charge.merchant.model.MerchantInfo;
+import cn.com.cdboost.charge.merchant.service.IMerchantInfoService;
+import org.springframework.stereotype.Service;
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+public class IMerchantInfoServiceImpl extends BaseServiceImpl<MerchantInfo> implements IMerchantInfoService {
+}

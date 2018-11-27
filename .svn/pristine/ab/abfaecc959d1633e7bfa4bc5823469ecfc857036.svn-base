@@ -1,0 +1,23 @@
+package cn.com.cdboost.charge.merchant.service;
+
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.merchant.vo.info.ProjectVo;
+import cn.com.cdboost.charge.merchant.vo.param.ProjectQueryParam;
+
+import java.util.List;
+
+/**
+ * 站点接口
+ */
+public interface ProjectServiceDubbo {
+    //查询站点列表
+    PageData queryProjectByPropertyGuid(ProjectQueryParam queryVo);
+    //新增站点
+    void addProject(ProjectVo queryVo);
+    //修改站点
+    void updateProject(ProjectVo queryVo);
+    //删除站点
+    void deleteProjectByProjectGuids(List<String> projectGuids);
+    //查询站点详情
+    ProjectVo queryProjectDetail(String projectGuid);
+}

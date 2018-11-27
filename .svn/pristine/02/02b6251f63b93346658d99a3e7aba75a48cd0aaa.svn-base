@@ -1,0 +1,311 @@
+package cn.com.cdboost.charge.merchant.dubbo.impl;
+
+import cn.com.cdboost.charge.base.exception.BusinessException;
+import cn.com.cdboost.charge.base.util.UuidUtil;
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.merchant.constant.DeviceConstant;
+import cn.com.cdboost.charge.merchant.constant.SchemeConstant;
+import cn.com.cdboost.charge.merchant.dao.ProjectMapper;
+import cn.com.cdboost.charge.merchant.dao.ProjectPayChemeMapper;
+import cn.com.cdboost.charge.merchant.dto.ChargingProjectDaoDto;
+import cn.com.cdboost.charge.merchant.dto.ProjectInfoDaoDto;
+import cn.com.cdboost.charge.merchant.dto.ProjectListDto;
+import cn.com.cdboost.charge.merchant.dto.param.ChargerSchemeQueryDaoVo;
+import cn.com.cdboost.charge.merchant.dto.param.ProjectQueryParamDao;
+import cn.com.cdboost.charge.merchant.model.MerchantInfo;
+import cn.com.cdboost.charge.merchant.model.MerchantProperty;
+import cn.com.cdboost.charge.merchant.model.Project;
+import cn.com.cdboost.charge.merchant.model.ProjectPayCheme;
+import cn.com.cdboost.charge.merchant.service.IMerchantInfoService;
+import cn.com.cdboost.charge.merchant.service.IMerchantPropertyService;
+import cn.com.cdboost.charge.merchant.service.IPaySchemeService;
+import cn.com.cdboost.charge.merchant.service.IProjectService;
+import cn.com.cdboost.charge.merchant.dubbo.ProjectService;
+import cn.com.cdboost.charge.merchant.vo.dto.ChargingProjectDto;
+import cn.com.cdboost.charge.merchant.vo.dto.ProjectInfoDto;
+import cn.com.cdboost.charge.merchant.vo.info.ChargerSchemeQueryVo;
+import cn.com.cdboost.charge.merchant.vo.info.EditSchemeVo;
+import cn.com.cdboost.charge.merchant.vo.info.ProjectListInfo;
+import cn.com.cdboost.charge.merchant.vo.info.ProjectVo;
+import cn.com.cdboost.charge.merchant.vo.param.ProjectQueryParam;
+import cn.com.cdboost.charge.user.dto.info.OrgInfo;
+import cn.com.cdboost.charge.user.dubbo.OrgService;
+import com.alibaba.dubbo.config.annotation.Reference;
+import com.alibaba.dubbo.config.annotation.Service;
+import com.google.common.collect.Lists;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
+import tk.mybatis.mapper.entity.Condition;
+import tk.mybatis.mapper.entity.Example;
+
+import javax.annotation.Resource;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Set;
+
+@Slf4j
+@Service(version = "1.0", retries = -1)
+public class ProjectServiceImpl implements ProjectService {
+    @Autowired
+    private ProjectMapper projectMapper;
+    @Resource
+    private IMerchantInfoService iMerchantInfoService;
+    @Resource
+    private IMerchantPropertyService iMerchantPropertyService;
+    @Resource
+    private IProjectService iProjectService;
+    @Resource
+    private IPaySchemeService iPaySchemeService;
+    @Resource
+    private ProjectPayChemeMapper projectPayChemeMapper;
+    @Reference(version = "1.0")
+    private OrgService orgService;
+
+    @Override
+    public PageData<ProjectListInfo> queryProjectByPropertyGuid(ProjectQueryParam queryVo) {
+        PageData<ProjectListInfo> pageData = new PageData();
+        ProjectQueryParamDao projectQueryParamDao = new ProjectQueryParamDao();
+        BeanUtils.copyProperties(queryVo,projectQueryParamDao);
+        projectQueryParamDao.setPageIndex((queryVo.getPageNumber() - 1) * queryVo.getPageSize());
+        List<ProjectListDto> projectListDtos = projectMapper.queryProjectDeviceCount(projectQueryParamDao);
+        Integer total = projectMapper.queryTotal(projectQueryParamDao);
+        List<ProjectListInfo> respList = Lists.newArrayList();
+        if (!CollectionUtils.isEmpty(projectListDtos)){
+            for (ProjectListDto projectListDto : projectListDtos) {
+                ProjectListInfo projectListInfo = new ProjectListInfo();
+                BeanUtils.copyProperties(projectListDto,projectListInfo);
+                respList.add(projectListInfo);
+            }
+            pageData.setList(respList);
+            pageData.setTotal(total.longValue());
+        }
+        return pageData;
+    }
+
+    @Override
+    @Transactional
+    public void addProject(ProjectVo queryVo) throws BusinessException{
+        Project project = new Project();
+        project.setProjectName(queryVo.getProjectName());
+        project.setIsDel(DeviceConstant.IsDel.NOTDEL.getStatus());
+        List<Project> select = iProjectService.select(project);
+        if (select.size() > 0) {
+            throw new BusinessException("站点名称不能重复！");
+        }
+        MerchantInfo param = new MerchantInfo();
+        param.setMerchantGuid(queryVo.getMerchantGuid());
+        MerchantInfo info = iMerchantInfoService.selectOne(param);
+        BeanUtils.copyProperties(queryVo, project);
+        String projectGuid = UuidUtil.getUuid();
+        project.setProjectGuid(projectGuid);
+        project.setPrice(queryVo.getBasePrice().add(queryVo.getUpPrice()));
+        project.setOrgNo(info.getOrgNo());
+        iProjectService.insertSelective(project);
+        queryVo.setProjectGuid(projectGuid);
+        this.editScheme(queryVo);
+    }
+    private void editScheme(ProjectVo queryVo){
+        //新增方案
+        List<EditSchemeVo> planList = queryVo.getPlanList();
+        if (!CollectionUtils.isEmpty(planList)){
+            //新增的方案
+            List<ProjectPayCheme> addScheme = Lists.newArrayList();
+            //删除的方案
+            List<String> deleteScheme = Lists.newArrayList();
+            //停用或启用的方案
+            List<ProjectPayCheme> offOnScheme = Lists.newArrayList();
+            for (EditSchemeVo chargingSchemeDto : planList) {
+                ProjectPayCheme chargingPayCheme = new ProjectPayCheme();
+                if (chargingSchemeDto.getFlag() != null) {
+                    if (chargingSchemeDto.getFlag() == 0) {//判断该方案是新增还是删除 0-新增 1-删除 2-修改 3-启用或停用
+                        BeanUtils.copyProperties(chargingSchemeDto, chargingPayCheme);
+
+                        //暂时写死月卡为1个月
+                        if (chargingSchemeDto.getPayCategory() == SchemeConstant.SchemePayCategory.MONTH_RECHARGE.getType()){
+                            chargingPayCheme.setNumMonths(1);
+                        }else {
+                            chargingPayCheme.setNumMonths(0);
+                        }
+                        chargingPayCheme.setSchemeGuid(UuidUtil.getUuid());
+                        //chargingPayCheme.setIsEnable(ChargeConstant.SchemeIsEnable.ABLE.getType());
+                        //后端写死排序，月卡排前面
+                        if (chargingSchemeDto.getPayCategory() == SchemeConstant.SchemePayCategory.MONTH_RECHARGE.getType()) {
+                            chargingPayCheme.setSortNo(1);
+                        } else if (chargingSchemeDto.getPayCategory() == SchemeConstant.SchemePayCategory.RECHARGE_FULL.getType()) {
+                            chargingPayCheme.setSortNo(2);
+                        } else if (chargingSchemeDto.getPayCategory() == SchemeConstant.SchemePayCategory.TEMPORARY_RECHARGE.getType()) {
+                            chargingPayCheme.setSortNo(3);
+                        } else {
+                            chargingPayCheme.setSortNo(4);
+                        }
+                        chargingPayCheme.setCreateTime(new Date());
+                        chargingPayCheme.setUpdateTime(new Date());
+                        addScheme.add(chargingPayCheme);
+                    } else if (chargingSchemeDto.getFlag() == 1) {
+                        deleteScheme.add(chargingSchemeDto.getSchemeGuid());
+                    } else if (chargingSchemeDto.getFlag() == 2) {
+                        //删除编辑前的方案
+                        deleteScheme.add(chargingSchemeDto.getSchemeGuid());
+                        //新增编辑后的方案
+                        BeanUtils.copyProperties(chargingSchemeDto, chargingPayCheme);
+                        chargingPayCheme.setSchemeGuid(UuidUtil.getUuid());
+                        //chargingPayCheme.setIsEnable(ChargeConstant.SchemeIsEnable.ABLE.getType());
+                        //后端写死排序，月卡排前面
+                        if (chargingSchemeDto.getPayCategory() == SchemeConstant.SchemePayCategory.MONTH_RECHARGE.getType()) {
+                            chargingPayCheme.setSortNo(1);
+                        } else if (chargingSchemeDto.getPayCategory() == SchemeConstant.SchemePayCategory.RECHARGE_FULL.getType()) {
+                            chargingPayCheme.setSortNo(2);
+                        } else if (chargingSchemeDto.getPayCategory() == SchemeConstant.SchemePayCategory.TEMPORARY_RECHARGE.getType()) {
+                            chargingPayCheme.setSortNo(3);
+                        } else {
+                            chargingPayCheme.setSortNo(4);
+                        }
+                        addScheme.add(chargingPayCheme);
+                    } else if (chargingSchemeDto.getFlag() == 3) {
+                        BeanUtils.copyProperties(chargingSchemeDto,chargingPayCheme);
+                        offOnScheme.add(chargingPayCheme);
+                    }
+                }
+            }
+            if (!CollectionUtils.isEmpty(deleteScheme)){
+                iPaySchemeService.updateSchemeIsEnable(deleteScheme,SchemeConstant.SchemeIsDel.UNABLE.getType());
+            }
+            if (!CollectionUtils.isEmpty(addScheme)) {
+                //插入新方案
+                iPaySchemeService.insertList(addScheme);
+            }
+            if (!CollectionUtils.isEmpty(offOnScheme)) {
+                //修改方案状态
+                projectPayChemeMapper.batchUpdate(offOnScheme);
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void updateProject(ProjectVo queryVo) throws BusinessException{
+        //判断修改站点名称是否重复
+        List<Project> projects = iProjectService.queryProjectsByCondition(queryVo.getProjectGuid(), queryVo.getProjectName());
+        if (projects.size() > 0) {
+            throw new BusinessException("站点名称不能重复！");
+        }
+        Project project = new Project();
+        BeanUtils.copyProperties(queryVo, project);
+        project.setUpdateTime(new Date());
+        iProjectService.updateByProjectGuid(project);
+    }
+
+    @Override
+    @Transactional
+    public void deleteProjectByProjectGuids(List<String> projectGuids) {
+        iProjectService.batchDelete(projectGuids);
+    }
+
+    @Override
+    public ProjectVo queryProjectDetail(String projectGuid) {
+        Project param = new Project();
+        param.setProjectGuid(projectGuid);
+        Project project = iProjectService.selectOne(param);
+        ProjectVo projectVo = new ProjectVo();
+        BeanUtils.copyProperties(project, projectVo);
+        if (!StringUtils.isEmpty(project.getPropertyGuid())){
+            MerchantProperty property = new MerchantProperty();
+            property.setPropertyGuid(project.getPropertyGuid());
+            MerchantProperty merchantProperty = iMerchantPropertyService.selectOne(property);
+            projectVo.setPropertyName(merchantProperty.getPropertyName());
+        }
+        return projectVo;
+    }
+
+    @Override
+    public PageData<ProjectVo> queryProjects(ProjectQueryParam queryVo) {
+        PageData<Project> projectPageData = iProjectService.queryProjectsPage(queryVo);
+        PageData<ProjectVo> projectVoPageData = new PageData<>();
+        List<ProjectVo> projectVos = Lists.newArrayList();
+        if (!CollectionUtils.isEmpty(projectPageData.getList())) {
+            for (Project project : projectPageData.getList()) {
+                ProjectVo vo = new ProjectVo();
+                BeanUtils.copyProperties(project, vo);
+                projectVos.add(vo);
+            }
+        }
+        projectVoPageData.setList(projectVos);
+        projectVoPageData.setTotal(projectPageData.getTotal());
+        return projectVoPageData;
+    }
+
+    @Override
+    public List<ProjectVo> queryAllProject(Integer userId) {
+        //查询用户所属组织
+        List<Long> longs = orgService.queryDataOrgList(userId);
+        List list = Lists.newArrayList(longs);
+        Condition condition = new Condition(Project.class);
+        Example.Criteria criteria = condition.createCriteria();
+        criteria.andIn("orgNo", list);
+        criteria.andEqualTo("isDel", 0);
+        //查询用户所属组织下的所有项目
+        List<Project> chargingProjects = projectMapper.selectByCondition(condition);
+        List<ProjectVo> projectDtos = Lists.newArrayList();
+        for (Project chargingProject : chargingProjects) {
+            ProjectVo projectDto = new ProjectVo();
+            BeanUtils.copyProperties(chargingProject, projectDto);
+            projectDtos.add(projectDto);
+        }
+        return projectDtos;
+    }
+
+    @Override
+    public List<ProjectInfoDto> queryProjectTreeByName(Set<Long> dataOrgNos, String projectName) {
+        List<Long> orgList = Lists.newArrayList(dataOrgNos);
+        List<ProjectInfoDaoDto> projectInfoDaoDtos = projectMapper.queryProjectTreeByName(orgList, projectName);
+        List<ProjectInfoDto> projectInfoDtos = Lists.newArrayList();
+        for (ProjectInfoDaoDto projectInfoDaoDto : projectInfoDaoDtos) {
+            ProjectInfoDto projectInfoDto = new ProjectInfoDto();
+            BeanUtils.copyProperties(projectInfoDaoDto, projectInfoDto);
+            projectInfoDtos.add(projectInfoDto);
+        }
+        return projectInfoDtos;
+    }
+
+    @Override
+    public PageData queryList(ChargerSchemeQueryVo queryVo, Integer userId) {
+        // 查询用户的组织数据权限
+        List<Long> dataOrgNos = orgService.queryDataOrgList(userId);
+
+        if("1".equals(queryVo.getNodeType())){
+
+            String orgNo = queryVo.getNodeId();
+            List<Long> childOrgNos = orgService.queryChildren(Long.valueOf(orgNo));
+            dataOrgNos.retainAll(childOrgNos);
+        }
+        queryVo.setOrgNoList(dataOrgNos);
+        queryVo.setPageIndex((queryVo.getPageNumber() - 1) * queryVo.getPageSize());
+        //查询列表
+        ChargerSchemeQueryDaoVo chargerSchemeQueryDaoVo=new ChargerSchemeQueryDaoVo();
+        BeanUtils.copyProperties(queryVo,chargerSchemeQueryDaoVo);
+        List<ChargingProjectDaoDto> chargingProjectDaoDtos = projectMapper.queryList(chargerSchemeQueryDaoVo);
+        List<ChargingProjectDto> chargingProjectInfos = Lists.newArrayList();
+        for (ChargingProjectDaoDto chargingProjectDaoDto : chargingProjectDaoDtos) {
+            List<OrgInfo> orgInfos = orgService.batchQueryByOrgNos(Collections.singleton(chargingProjectDaoDto.getOrgNo()));
+
+            ChargingProjectDto chargingProjectDto=new ChargingProjectDto();
+            chargingProjectDaoDto.setOrgName(orgInfos.get(0).getOrgName());
+            BeanUtils.copyProperties(chargingProjectDaoDto,chargingProjectDto);
+            chargingProjectInfos.add(chargingProjectDto);
+        }
+
+        //设置总条数
+
+        Long total = projectMapper.queryListTotal(chargerSchemeQueryDaoVo);
+        queryVo.setTotal(total);
+        PageData pageData=new PageData();
+        pageData.setList(chargingProjectInfos);
+        pageData.setTotal(total);
+        return pageData;
+    }
+}

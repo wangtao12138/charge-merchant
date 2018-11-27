@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.cdboost.charge.merchant.dao.CardMapper">
+  <resultMap id="BaseResultMap" type="cn.com.cdboost.charge.merchant.model.Card">
+    <!--
+      WARNING - @mbg.generated
+    -->
+    <result column="id" jdbcType="INTEGER" property="id" />
+    <result column="merchant_guid" jdbcType="VARCHAR" property="merchantGuid" />
+    <result column="project_guid" jdbcType="CHAR" property="projectGuid" />
+    <result column="customer_name" jdbcType="VARCHAR" property="customerName" />
+    <result column="customer_contact" jdbcType="VARCHAR" property="customerContact" />
+    <result column="card_id" jdbcType="VARCHAR" property="cardId" />
+    <result column="card_state" jdbcType="INTEGER" property="cardState" />
+    <result column="use_cnt" jdbcType="INTEGER" property="useCnt" />
+    <result column="init_amount" jdbcType="DECIMAL" property="initAmount" />
+    <result column="remain_amount" jdbcType="DECIMAL" property="remainAmount" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="remark" jdbcType="VARCHAR" property="remark" />
+    <result column="customer_guid" jdbcType="VARCHAR" property="customerGuid" />
+  </resultMap>
+</mapper>

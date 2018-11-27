@@ -1,0 +1,188 @@
+package cn.com.cdboost.charge.merchant.dubbo.impl;
+
+import cn.com.cdboost.charge.base.exception.BusinessException;
+import cn.com.cdboost.charge.merchant.constant.DeviceConstant;
+import cn.com.cdboost.charge.merchant.dubbo.MerchantToCustomerService;
+import cn.com.cdboost.charge.merchant.model.*;
+import cn.com.cdboost.charge.merchant.service.*;
+import cn.com.cdboost.charge.merchant.vo.info.ChargingSchemeDeviceVo;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceRelationVo;
+import cn.com.cdboost.charge.merchant.vo.info.IcCardDetailVo;
+import cn.com.cdboost.charge.merchant.vo.info.ProjectVo;
+import cn.com.cdboost.charge.merchant.vo.param.CustomerChargingParam;
+import cn.com.cdboost.charge.merchant.vo.param.DeviceQueryParam;
+import cn.com.cdboost.charge.settlement.dubbo.AccountService;
+import com.alibaba.dubbo.config.annotation.Reference;
+import com.alibaba.dubbo.config.annotation.Service;
+import com.alibaba.fastjson.JSONObject;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+@Slf4j
+@Service(version = "1.0",retries = -1,timeout = 5000)
+public class MerchantToCustomerServiceImpl implements MerchantToCustomerService {
+    @Autowired
+    private IDeviceService iDeviceService;
+    @Autowired
+    private IProjectService iProjectService;
+    @Autowired
+    private IIcCardService iIcCardService;
+    @Autowired
+    private IMerchantInfoService iMerchantInfoService;
+    @Autowired
+    private IPaySchemeService iPaySchemeService;
+
+    @Reference(version = "1.0")
+    private AccountService accountService;
+
+    @Override
+    public DeviceRelationVo queryDevice(DeviceQueryParam queryParam) {
+        DeviceRelationVo deviceVo = new DeviceRelationVo();
+        Device param = new Device();
+        if (!StringUtils.isEmpty(queryParam.getDeviceNo())){
+            param.setDeviceNo(queryParam.getDeviceNo().substring(0,7));
+            param.setPort(queryParam.getDeviceNo().substring(7,8));
+        }
+        if (!StringUtils.isEmpty(queryParam.getChargingPlieGuid())){
+            param.setChargingPlieGuid(queryParam.getChargingPlieGuid());
+        }
+        Device device = iDeviceService.selectOne(param);
+        Project project = new Project();
+        project.setProjectGuid(device.getProjectGuid());
+        Project selectProject = iProjectService.selectOne(project);
+        BeanUtils.copyProperties(device,deviceVo);
+        deviceVo.setContactPhone(selectProject.getContactPhone());
+        deviceVo.setProjectName(selectProject.getProjectName());
+        return deviceVo;
+    }
+
+    @Override
+    public List<DeviceRelationVo> queryDevices(List<String> chargingPlieGuids) {
+        List<Device> devices = iDeviceService.queryDevices(chargingPlieGuids);
+        Set<String> projectGuids = Sets.newHashSet();
+        List<DeviceRelationVo> deviceVos = Lists.newArrayList();
+        for (Device device : devices) {
+            projectGuids.add(device.getProjectGuid());
+            DeviceRelationVo deviceVo = new DeviceRelationVo();
+            BeanUtils.copyProperties(device,deviceVo);
+            deviceVos.add(deviceVo);
+        }
+        List<Project> projects = iProjectService.queryProjects(new ArrayList(projectGuids));
+        Map<String,Project> projectMap = Maps.newHashMap();
+        if (!CollectionUtils.isEmpty(projects)) {
+            for (Project project : projects) {
+                projectMap.put(project.getProjectGuid(), project);
+            }
+        }
+        for (DeviceRelationVo deviceVo : deviceVos) {
+            deviceVo.setContactPhone(projectMap.get(deviceVo.getProjectGuid()).getContactPhone());
+            deviceVo.setProjectName(projectMap.get(deviceVo.getProjectGuid()).getProjectName());
+        }
+        return deviceVos;
+    }
+
+    @Override
+    public void bindingCustomer(String cardId, String customerGuid,String userPhone) {
+        iIcCardService.bindingCustomer(cardId,customerGuid,userPhone);
+    }
+
+    @Override
+    @Transactional
+    public void unbind(String cardId) {
+        iIcCardService.unbind(cardId);
+        //TODO ic卡余额转到客户余额
+    }
+
+    @Override
+    public List<IcCardDetailVo> queryCardList(String customerGuid) {
+        List<IcCardDetailVo> cardDetailVos = Lists.newArrayList();
+        Card param = new Card();
+        param.setCustomerGuid(customerGuid);
+        List<Card> select = iIcCardService.select(param);
+        for (Card card : select) {
+            IcCardDetailVo vo = new IcCardDetailVo();
+            BeanUtils.copyProperties(card,vo);
+            cardDetailVos.add(vo);
+        }
+        return cardDetailVos;
+    }
+
+    @Override
+    public List<ProjectVo> queryProjects(List<String> projectGuids) {
+        List<Project> projects = iProjectService.queryProjects(projectGuids);
+        List<ProjectVo> projectVos = Lists.newArrayList();
+        for (Project project : projects) {
+            ProjectVo vo = new ProjectVo();
+            BeanUtils.copyProperties(project,vo);
+            projectVos.add(vo);
+        }
+        return projectVos;
+    }
+
+    @Override
+    public ChargingSchemeDeviceVo queryChargeDeviceSchemeInfo(CustomerChargingParam param) throws BusinessException{
+        log.info("queryChargeDeviceSchemeInfo" + JSONObject.toJSONString(param));
+        ChargingSchemeDeviceVo schemeDeviceVo = new ChargingSchemeDeviceVo();
+        String projectGuid = null;
+        String merchantGuid = null;
+        Device device = null;
+        if (!StringUtils.isEmpty(param.getDeviceNo())){
+            Device deviceParam = new Device();
+            deviceParam.setDeviceNo(param.getDeviceNo().substring(0,7));
+            deviceParam.setPort(param.getDeviceNo().substring(7,8));
+            deviceParam.setIsDel(DeviceConstant.IsDel.NOTDEL.getStatus());
+            device = iDeviceService.selectOne(deviceParam);
+            projectGuid = device.getProjectGuid();
+            merchantGuid = device.getMerchantGuid();
+        }
+        if (!StringUtils.isEmpty(param.getChargingPlieGuid())){
+            Device deviceParam = new Device();
+            deviceParam.setChargingPlieGuid(param.getChargingPlieGuid());
+            device = iDeviceService.selectOne(deviceParam);
+            projectGuid = device.getProjectGuid();
+            merchantGuid = device.getMerchantGuid();
+        }
+
+        //判断设备是否绑定到商户
+        if (StringUtils.isEmpty(merchantGuid)){
+            throw new BusinessException("该设备还未绑定到商户");
+        }
+        BeanUtils.copyProperties(device,schemeDeviceVo);
+        //查询站点相关信息
+        Project projectParam = new Project();
+        projectParam.setProjectGuid(projectGuid);
+        Project project = iProjectService.selectOne(projectParam);
+        schemeDeviceVo.setPrice(project.getPrice());
+        schemeDeviceVo.setPropertyGuid(project.getPropertyGuid());
+        //查询商户相关信息
+        MerchantInfo merchantInfoParam = new MerchantInfo();
+        merchantInfoParam.setMerchantGuid(merchantGuid);
+        MerchantInfo merchantInfo = iMerchantInfoService.selectOne(merchantInfoParam);
+        schemeDeviceVo.setServiceMode(merchantInfo.getServiceMode());
+        //查询方案相关信息
+        ProjectPayCheme projectPayChemeParam = new ProjectPayCheme();
+        projectPayChemeParam.setSchemeGuid(param.getSchemeGuid());
+        ProjectPayCheme projectPayCheme = iPaySchemeService.selectOne(projectPayChemeParam);
+        schemeDeviceVo.setRealMoney(projectPayCheme.getRealMoney());
+        schemeDeviceVo.setChargingCnt(projectPayCheme.getChargingCnt());
+        schemeDeviceVo.setChargingTime(projectPayCheme.getChargingTime());
+        schemeDeviceVo.setMaxPower(projectPayCheme.getMaxPower());
+        schemeDeviceVo.setMinPower(projectPayCheme.getMinPower());
+        schemeDeviceVo.setPayCategory(projectPayCheme.getPayCategory());
+        schemeDeviceVo.setSchemeType(projectPayCheme.getSchemeType());
+        schemeDeviceVo.setSchemeGuid(projectPayCheme.getSchemeGuid());
+        return schemeDeviceVo;
+    }
+}

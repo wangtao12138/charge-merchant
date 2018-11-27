@@ -1,0 +1,83 @@
+package cn.com.cdboost.charge.merchant.dubbo;
+
+import cn.com.cdboost.charge.base.exception.BusinessException;
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceCountByRunStateVo;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceDetailVo;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceEventVo;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceVo;
+import cn.com.cdboost.charge.merchant.vo.param.DevicePageQueryParam;
+
+import java.util.List;
+
+/**
+ * 充电设备接口
+ */
+public interface DeviceService {
+    /**
+     * 查询设备列表
+     * @param queryVo
+     * @return
+     */
+    PageData queryDeviceByProjectGuid(DevicePageQueryParam queryVo);
+
+    /**
+     * 新增设备
+     * @param vo
+     */
+    void addDevice(DeviceVo vo) throws BusinessException;
+
+    /**
+     * 修改设备
+     * @param vo
+     */
+    void updateDevice(DeviceVo vo) throws BusinessException;
+
+    /**
+     * 删除设备
+     * @param deviceNos
+     */
+    void deleteDeviceByDeviceNos(List<String> deviceNos);
+
+    /**
+     * 查询设备详情
+     * @param chargingPlieGuid
+     * @return
+     */
+    DeviceDetailVo queryDeviceDetail(String chargingPlieGuid);
+
+    /**
+     * 商户绑定设备到站点
+     * @param vo
+     */
+    void bindingProject(DeviceVo vo);
+
+    /**
+     * 统计设备插座数量
+     * @param merchantGuid
+     * @return
+     */
+    DeviceCountByRunStateVo queryDeviceCount(String merchantGuid);
+
+    /**
+     * 通过设备编号及端口号查询设备
+     * @param deviceNo
+     * @param port
+     * @return
+     */
+    DeviceVo queryDevice(String deviceNo,String port);
+
+    /**
+     * 批量查询设备
+     * @param chargingPlieGuids
+     */
+    List<DeviceVo> queryDevices(List<String> chargingPlieGuids);
+
+    /**
+     * 查询设备事件
+     * @param
+     */
+    PageData<DeviceEventVo> queryDeviceEvents(String merchantGuid,Integer eventCode,Integer pageNumber, Integer pageSize);
+
+    public DeviceVo queryByChargingPlieGuid(String chargingPlieGuid);
+}

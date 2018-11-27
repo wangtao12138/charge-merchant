@@ -1,0 +1,7 @@
+package cn.com.cdboost.charge.merchant.service;
+
+/**
+ * 充电方案接口
+ */
+public interface PaySchemeServiceDubbo {
+}

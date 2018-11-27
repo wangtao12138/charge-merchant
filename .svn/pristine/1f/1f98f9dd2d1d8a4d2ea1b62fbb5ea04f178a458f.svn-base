@@ -1,0 +1,17 @@
+package cn.com.cdboost.charge.merchant.service;
+
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.merchant.vo.info.ProjectVo;
+import cn.com.cdboost.charge.merchant.vo.param.ProjectQueryParam;
+
+import java.util.List;
+
+/**
+ * 站点接口
+ */
+public interface ProjectService {
+    PageData queryProjectByPropertyGuid(ProjectQueryParam queryVo);
+    void addProject(ProjectVo queryVo);
+    void updateProject(ProjectVo queryVo);
+    void deleteProjectByProjectGuids(List<String> projectGuids);
+}

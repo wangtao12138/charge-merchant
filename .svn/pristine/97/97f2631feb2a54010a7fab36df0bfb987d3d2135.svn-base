@@ -1,0 +1,14 @@
+package cn.com.cdboost.charge.merchant.vo.info;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class ChargeHeartStepVo {
+    private String commNo;
+
+    private Integer heartStep;
+
+
+}

@@ -1,0 +1,7 @@
+package cn.com.cdboost.charge.merchant.service;
+
+/**
+ * 商户接口
+ */
+public interface MerchantInfoService {
+}

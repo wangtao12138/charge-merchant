@@ -1,0 +1,17 @@
+package cn.com.cdboost.charge.merchant.service;
+
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.merchant.vo.info.DeviceVo;
+import cn.com.cdboost.charge.merchant.vo.param.DeviceQueryParam;
+
+import java.util.List;
+
+/**
+ * 充电设备接口
+ */
+public interface DeviceService {
+    PageData queryProjectByProjectGuid(DeviceQueryParam queryVo);
+    void addDevice(DeviceVo vo);
+    void updateDevice(DeviceVo vo);
+    void deleteDeviceByDeviceGuids(List<String> deviceGuids);
+}

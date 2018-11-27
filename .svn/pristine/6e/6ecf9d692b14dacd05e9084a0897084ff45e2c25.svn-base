@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.cdboost.charge.merchant.dao.CardListMapper">
+  <resultMap id="BaseResultMap" type="cn.com.cdboost.charge.merchant.model.CardList">
+    <!--
+      WARNING - @mbg.generated
+    -->
+    <result column="id" jdbcType="INTEGER" property="id" />
+    <result column="point_code" jdbcType="INTEGER" property="pointCode" />
+    <result column="device_no" jdbcType="VARCHAR" property="deviceNo" />
+    <result column="comm_no" jdbcType="VARCHAR" property="commNo" />
+    <result column="card_id" jdbcType="VARCHAR" property="cardId" />
+    <result column="state" jdbcType="INTEGER" property="state" />
+    <result column="send_flag" jdbcType="INTEGER" property="sendFlag" />
+    <result column="write_time" jdbcType="TIMESTAMP" property="writeTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="project_guid" jdbcType="VARCHAR" property="projectGuid" />
+  </resultMap>
+  <select id="addDevCardList" parameterType="cn.com.cdboost.charge.merchant.dto.param.ICCardListParam" statementType="CALLABLE">
+    {call PRC_W_D_Charging_AddDevCardList(
+    #{oldProjectGuid, mode=IN, jdbcType=VARCHAR},
+    #{projectGuid, mode=IN, jdbcType=VARCHAR},
+    #{deviceNo, mode=IN, jdbcType=VARCHAR},
+    #{commNo, mode=IN, jdbcType=VARCHAR},
+    #{result, mode=OUT, jdbcType=VARCHAR}
+    )}
+  </select>
+</mapper>

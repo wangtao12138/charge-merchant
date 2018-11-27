@@ -1,0 +1,107 @@
+package cn.com.cdboost.charge.merchant.vo.info;
+
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.io.Serializable;
+import java.math.BigDecimal;
+
+@Getter
+@Setter
+@ApiModel(value = "DeviceVo", description = "充电桩设备对象")
+public class DeviceVo implements Serializable{
+
+    private static final long serialVersionUID = 2508545010699037016L;
+
+    @ApiModelProperty(value = "商户标识")
+    private String merchantGuid;
+
+    @ApiModelProperty(value = "项目标识")
+    private String projectGuid;
+
+    @ApiModelProperty(value = "设备标识")
+    private String chargingPlieGuid;
+
+    @ApiModelProperty(value = "充电桩名称")
+    private String deviceName;
+
+    @ApiModelProperty(value = "设备编号")
+    private String deviceNo;
+
+    @ApiModelProperty(value = "充电桩设备型号")
+    private String deviceMode;
+
+    @ApiModelProperty(value = "通信编号")
+    private String commNo;
+
+    @ApiModelProperty(value = "充电桩端口（0-9、a-f 一共16个端口号）")
+    private String port;
+
+    @ApiModelProperty(value = "0 -离线 1-在线")
+    private Integer online;
+
+    @ApiModelProperty(value = "通信方式 32-loraWAN")
+    private Integer comMethod;
+
+    @ApiModelProperty(value = "充电桩状态 0 空闲 1-充电 2-停用  -1故障")
+    private Integer runState;
+
+    @ApiModelProperty(value = "电流越限阀值")
+    private BigDecimal currentLimit;
+
+    @ApiModelProperty(value = "省")
+    private String province;
+
+    @ApiModelProperty(value = "市")
+    private String city;
+
+    @ApiModelProperty(value = "区")
+    private String district;
+
+    @ApiModelProperty(value = "经度坐标")
+    private BigDecimal lng;
+
+    @ApiModelProperty(value = "纬度坐标")
+    private BigDecimal lat;
+
+    @ApiModelProperty(value = "1 GPS 2百度坐标")
+    private Integer locationType;
+
+    @ApiModelProperty(value = "安装地址")
+    private String installAddr;
+
+    @ApiModelProperty(value = "安装时间")
+    private String installDate;
+
+    @ApiModelProperty(value = "设备描述")
+    private String remark;
+
+    @ApiModelProperty(value = "总表表号")
+    private String meterNo;
+
+    @ApiModelProperty(value = "总表地址cno")
+    private String meterCno;
+
+    @ApiModelProperty(value = "变压器号")
+    private String transformerNo;
+
+    @ApiModelProperty(value = "设备状态下发标识 0-未下发 1-已下发")
+    private Integer sendFlag;
+
+    @ApiModelProperty(value = "创建人员ID")
+    private Long createUserId;
+
+    @ApiModelProperty(value = "创建时间")
+    private String createTime;
+
+    @ApiModelProperty(value = "更新人员ID")
+    private Long updateUserId;
+
+    @ApiModelProperty(value = "更新时间")
+    private String updateTime;
+
+    @ApiModelProperty(value = "是否删除 1 正常 0删除")
+    private Integer isDel;
+}

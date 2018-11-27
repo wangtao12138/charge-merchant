@@ -1,0 +1,136 @@
+package cn.com.cdboost.charge.merchant.vo.dto;
+
+import com.alibaba.fastjson.annotation.JSONField;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.util.Date;
+
+@Getter
+@Setter
+public class MonitorDeviceDto implements Serializable{
+
+    private String chargingPlieGuid;
+
+    private Integer runState;
+
+    private String deviceNo;
+
+    private String deviceName;
+
+    private String commNo;
+
+    private BigDecimal percent = BigDecimal.ZERO;
+    /**
+     * 开始充电时间
+     */
+    private String startTime;
+    /**
+     *设备类型
+     */
+    private Integer carCategory;
+    /**
+     *计费方式
+     */
+    private Integer payCategory;
+    /**
+     * 充电扣除费用
+     */
+    private BigDecimal deductMoney;
+    /**
+     * 充电时长
+     */
+    private Integer useTime;
+    /**
+     * 剩余时长
+     */
+    private BigDecimal remainTime = BigDecimal.ZERO;
+    /**
+     * 剩余金额
+     */
+    private BigDecimal remainAmount = BigDecimal.ZERO;
+
+    private BigDecimal current = BigDecimal.ZERO;
+
+    private BigDecimal voltage = BigDecimal.ZERO;
+
+    private BigDecimal power = BigDecimal.ZERO;
+
+    private String updateTime;
+    /**
+     * 剩余电量
+     */
+    private BigDecimal remainElectric;
+
+    private String webcharNo;
+
+    private String customerGuid;
+
+    private String customerName;
+    //充电使用记录唯一标识
+    private String chargingGuid;
+    /**
+     * 1-按时充电 2-按电量充电 3-充满断电
+     */
+    private Integer chargingWay;
+
+    /**
+     * 0 - 不限制 其他值标识充电时长，单位小时
+     */
+    private Integer chargingTime;
+
+    /**
+     * 端口号
+     */
+    private String port;
+
+    /**
+     * 应充电量
+     */
+    private Integer chargingPower;
+
+    /**
+     * 已使用电量
+     */
+    private BigDecimal usePower = BigDecimal.ZERO;
+    /**
+     * 0 -离线 1-在线
+     */
+    private Integer online;
+
+    private String openNo;
+
+    private String projectName;
+
+    /**
+     * 开启方式 1-微信 2-支付宝 3-IC卡
+     */
+    private Integer openMeans;
+
+    //功率
+    private Integer maxPower;
+    //
+    private BigDecimal schemeMoney;
+
+    private Integer schememTime;
+
+    private Integer chargingCnt;
+    //上行信号强度
+    private Integer upRssi;
+    //上行信噪比
+    private BigDecimal upSnr;
+    //下行信号强度
+    private Integer downRssi;
+    //下行信噪比
+    private BigDecimal downSnr;
+
+    @JSONField(format = "yyyy-MM-dd HH:mm:ss")
+    private Date upSignalTime;
+    @JSONField(format = "yyyy-MM-dd HH:mm:ss")
+    private Date downSignalTime;
+
+    private Integer devTemperature;
+
+}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.com.cdboost.charge.merchant.dao.MerchantInfoMapper">
+  <resultMap id="BaseResultMap" type="cn.com.cdboost.charge.merchant.model.MerchantInfo">
+    <!--
+      WARNING - @mbg.generated
+    -->
+    <result column="id" jdbcType="INTEGER" property="id" />
+    <result column="merchant_name" jdbcType="VARCHAR" property="merchantName" />
+    <result column="merchant_phone" jdbcType="VARCHAR" property="merchantPhone" />
+    <result column="webchart_no" jdbcType="VARCHAR" property="webchartNo" />
+    <result column="alipay_no" jdbcType="VARCHAR" property="alipayNo" />
+    <result column="last_login_time" jdbcType="TIMESTAMP" property="lastLoginTime" />
+    <result column="merchart_state" jdbcType="INTEGER" property="merchartState" />
+    <result column="remark" jdbcType="VARCHAR" property="remark" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="is_del" jdbcType="INTEGER" property="isDel" />
+    <result column="org_no" property="orgNo" jdbcType="BIGINT" />
+    <result column="profit_ratio" property="profitRatio" jdbcType="DECIMAL" />
+    <result column="service_ratio" property="serviceRatio" jdbcType="DECIMAL" />
+    <result column="refund_ratio" property="refundRatio" jdbcType="DECIMAL" />
+    <result column="service_mode" property="serviceMode" jdbcType="INTEGER" />
+  </resultMap>
+</mapper>

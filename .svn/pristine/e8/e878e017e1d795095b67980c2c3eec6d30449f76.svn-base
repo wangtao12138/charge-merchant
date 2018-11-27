@@ -1,0 +1,30 @@
+package cn.com.cdboost.charge.merchant.dubbo;
+
+
+import cn.com.cdboost.charge.merchant.vo.info.MerchantInfoVo;
+import cn.com.cdboost.charge.merchant.vo.param.MerchantQueryParam;
+
+/**
+ * 商户接口
+ */
+public interface MerchantInfoService {
+    /**
+     * 商户注册
+     * @param phoneNumber
+     * @param verificationCode
+     */
+    boolean register(String phoneNumber,Integer appType,String openId, String nickName,String merchantName, String verificationCode);
+
+    /**
+     * 查询商户详情
+     * @param
+     * @return
+     */
+    MerchantInfoVo queryMerchantInfo(MerchantQueryParam queryParam);
+
+    /**
+     * 修改商户信息
+     * @param merchantInfoVo
+     */
+    void updateMerchantInfo(MerchantInfoVo merchantInfoVo);
+}

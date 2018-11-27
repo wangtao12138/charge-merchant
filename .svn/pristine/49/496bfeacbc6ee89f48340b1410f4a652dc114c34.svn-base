@@ -1,0 +1,100 @@
+package cn.com.cdboost.charge.merchant.dubbo.impl;
+
+import cn.com.cdboost.charge.base.util.DateUtil;
+import cn.com.cdboost.charge.base.vo.PageData;
+import cn.com.cdboost.charge.merchant.dao.CardMapper;
+import cn.com.cdboost.charge.merchant.dto.IcCardCountDto;
+import cn.com.cdboost.charge.merchant.dto.IcCardListDto;
+import cn.com.cdboost.charge.merchant.dto.param.IcCardQueryParam;
+import cn.com.cdboost.charge.merchant.dubbo.IcCardService;
+import cn.com.cdboost.charge.merchant.model.Card;
+import cn.com.cdboost.charge.merchant.model.Project;
+import cn.com.cdboost.charge.merchant.service.IIcCardService;
+import cn.com.cdboost.charge.merchant.service.IProjectService;
+import cn.com.cdboost.charge.merchant.vo.info.IcCardCountVo;
+import cn.com.cdboost.charge.merchant.vo.info.IcCardDetailVo;
+import cn.com.cdboost.charge.merchant.vo.info.IcCardListVo;
+import cn.com.cdboost.charge.merchant.vo.param.IcCardParam;
+import com.alibaba.dubbo.config.annotation.Service;
+import com.google.common.collect.Lists;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import tk.mybatis.mapper.entity.Condition;
+import tk.mybatis.mapper.entity.Example;
+
+import java.util.List;
+
+@Slf4j
+@Service(version = "1.0",retries = -1)
+public class IcCardServiceImpl implements IcCardService{
+    @Autowired
+    private CardMapper cardMapper;
+    @Autowired
+    private IProjectService iProjectService;
+    @Autowired
+    private IIcCardService iIcCardService;
+
+    @Override
+    public IcCardCountVo queryIcCount(IcCardParam param) {
+        IcCardQueryParam queryParam = new IcCardQueryParam();
+        BeanUtils.copyProperties(param,queryParam);
+        //统计数量
+        IcCardCountDto icCardCountDto = cardMapper.queryIcCount(queryParam);
+        IcCardCountVo icCardCountVo = new IcCardCountVo();
+        BeanUtils.copyProperties(icCardCountDto,icCardCountVo);
+        return icCardCountVo;
+    }
+
+    @Override
+    public IcCardDetailVo queryIcDetail(String cardId) {
+        //查询ic卡基础信息
+        Card param = new Card();
+        param.setCardId(cardId);
+        Card card = iIcCardService.selectOne(param);
+        IcCardDetailVo cardDetailVo = new IcCardDetailVo();
+        BeanUtils.copyProperties(card,cardDetailVo);
+        cardDetailVo.setUpdateTime(DateUtil.formatDate(card.getUpdateTime()));
+        //查询ic卡所属站点名称
+        Project projectParam = new Project();
+        projectParam.setProjectGuid(card.getProjectGuid());
+        Project project = iProjectService.selectOne(projectParam);
+        cardDetailVo.setProjectName(project.getProjectName());
+        return cardDetailVo;
+    }
+
+    @Override
+    public PageData queryIcList(IcCardParam param) {
+        IcCardQueryParam queryParam = new IcCardQueryParam();
+        BeanUtils.copyProperties(param,queryParam);
+        queryParam.setPageIndex((queryParam.getPageNumber()-1) * queryParam.getPageSize());
+        List<IcCardListDto> cardListDtos = cardMapper.queryIcList(queryParam);
+        Integer total = cardMapper.queryIcListTotal(queryParam);
+        PageData pageData = new PageData();
+        pageData.setTotal(total.longValue());
+        pageData.setList(cardListDtos);
+        return pageData;
+    }
+
+    @Override
+    @Transactional
+    public void bindingProject(String merchantGuid, String projectGuid, String cardId) {
+        Card card = new Card();
+        card.setCardId(cardId);
+        card.setMerchantGuid(merchantGuid);
+        card.setProjectGuid(projectGuid);
+        Condition condition = new Condition(Card.class);
+        Example.Criteria criteria = condition.createCriteria();
+        criteria.andEqualTo("cardId",cardId);
+        cardMapper.updateByConditionSelective(card,condition);
+    }
+
+    @Override
+    @Transactional
+    public void cancelCard(String cardId) {
+        iIcCardService.cancelCard(cardId);
+        //TODO ic卡上余额转移
+    }
+}
